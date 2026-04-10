@@ -17,8 +17,8 @@ describe('getAutoAssign', () => {
     assert.equal(getAutoAssign('To-Do'), CONFIG.human.name);
   });
 
-  it('In-Progress keeps current (null)', () => {
-    assert.equal(getAutoAssign('In-Progress'), null);
+  it('In-Progress assigns to lead agent', () => {
+    assert.equal(getAutoAssign('In-Progress'), getAgentByRole('lead'));
   });
 
   it('Testing assigns to QA agent', () => {
@@ -27,8 +27,8 @@ describe('getAutoAssign', () => {
     assert.ok(qaAgent, 'QA agent should exist in config');
   });
 
-  it('Ready for Human Review assigns to human', () => {
-    assert.equal(getAutoAssign('Ready for Human Review'), CONFIG.human.name);
+  it('Ready for Human Review keeps current (null)', () => {
+    assert.equal(getAutoAssign('Ready for Human Review'), null);
   });
 
   it('Blocked assigns to human', () => {

@@ -10,3 +10,5 @@ FILE_REGISTRY.json
 sync-daemon.pid
 logs/
 pr-status/
+
+config.json

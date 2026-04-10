@@ -1,0 +1,27 @@
+{
+  "name": "stask",
+  "version": "0.1.0",
+  "description": "SQLite-backed task lifecycle CLI with Slack sync for AI agent teams",
+  "type": "module",
+  "bin": {
+    "stask": "./bin/stask.mjs"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "commands/",
+    "skills/",
+    "config.example.json"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "keywords": ["cli", "task", "slack", "sqlite", "ai-agents", "lifecycle"],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.8.0"
+  }
+}

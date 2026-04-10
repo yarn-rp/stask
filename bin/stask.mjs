@@ -1,0 +1,157 @@
+#!/usr/bin/env node
+/**
+ * stask — Unified task + Slack CLI for the OpenClaw agent team.
+ *
+ * Usage: stask <command> [args...]
+ *
+ * Commands:
+ *   create          Create a new task (uploads spec to Slack)
+ *   approve         Approve a task spec (reassign to Lead)
+ *   transition      Transition task status
+ *   subtask create  Create a subtask under a parent
+ *   subtask done    Mark a subtask as Done
+ *   qa              Submit QA verdict
+ *   heartbeat       Get pending work for an agent
+ *   list            List tasks (filterable)
+ *   show            Show task details
+ *   log             View audit log
+ *   pr-status     Poll PR for comments/merge
+ *   spec-update     Re-upload edited spec
+ *   session         Manage session locks (claim/release/status)
+ */
+
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { loadEnv, CONFIG } from '../lib/env.mjs';
+
+// Auto-load env before anything else
+loadEnv();
+
+// ─── Auto-start sync daemon (lazy guardian) ───────────────────────
+
+function ensureSyncDaemon() {
+  const pidFile = path.resolve(CONFIG.staskHome, 'sync-daemon.pid');
+  try {
+    const pid = parseInt(fs.readFileSync(pidFile, 'utf-8').trim(), 10);
+    process.kill(pid, 0); // Check if alive — throws if dead
+  } catch (_) {
+    // Not running — start it
+    import('../commands/sync-daemon.mjs').then(mod => {
+      mod.startDaemon();
+    }).catch(() => {});
+  }
+}
+
+// Don't auto-start for sync-daemon commands (avoid recursion) or read-only queries
+const _cmd = process.argv[2];
+if (_cmd && _cmd !== 'sync-daemon' && _cmd !== '--help' && _cmd !== '-h') {
+  ensureSyncDaemon();
+}
+
+// ─── Subcommand dispatch ───────────────────────────────────────────
+
+const COMMANDS = {
+  'create':         () => import('../commands/create.mjs'),
+  'approve':        () => import('../commands/approve.mjs'),
+  'transition':     () => import('../commands/transition.mjs'),
+  'subtask':        null, // nested — handled below
+  'qa':             () => import('../commands/qa.mjs'),
+  'heartbeat':      () => import('../commands/heartbeat.mjs'),
+  'list':           () => import('../commands/list.mjs'),
+  'show':           () => import('../commands/show.mjs'),
+  'log':            () => import('../commands/log.mjs'),
+  'pr-status':    () => import('../commands/pr-status.mjs'),
+  'spec-update':    () => import('../commands/spec-update.mjs'),
+  'session':        () => import('../commands/session.mjs'),
+  'delete':         () => import('../commands/delete.mjs'),
+  'assign':         () => import('../commands/assign.mjs'),
+  'sync':           () => import('../commands/sync.mjs'),
+  'sync-daemon':    () => import('../commands/sync-daemon.mjs'),
+};
+
+const SUBTASK_COMMANDS = {
+  'create': () => import('../commands/subtask-create.mjs'),
+  'done':   () => import('../commands/subtask-done.mjs'),
+};
+
+async function main() {
+  const args = process.argv.slice(2);
+  const cmd = args[0];
+
+  if (!cmd || cmd === '--help' || cmd === '-h') {
+    printHelp();
+    process.exit(0);
+  }
+
+  // Handle nested "subtask" commands
+  if (cmd === 'subtask') {
+    const subCmd = args[1];
+    if (!subCmd || !SUBTASK_COMMANDS[subCmd]) {
+      console.error(`Usage: stask subtask <create|done> [args...]`);
+      process.exit(1);
+    }
+    const mod = await SUBTASK_COMMANDS[subCmd]();
+    await mod.run(args.slice(2));
+    return;
+  }
+
+  // Run tests via `stask test [suite]`
+  if (cmd === 'test') {
+    const { execFileSync } = await import('child_process');
+    const { fileURLToPath } = await import('url');
+    const testDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../test');
+    const suite = args[1];
+    const pattern = suite ? `${testDir}/${suite}.test.mjs` : `${testDir}/*.test.mjs`;
+    try {
+      execFileSync(process.execPath, ['--test', pattern], { stdio: 'inherit' });
+    } catch (err) {
+      process.exit(err.status || 1);
+    }
+    return;
+  }
+
+  const loader = COMMANDS[cmd];
+  if (!loader) {
+    console.error(`Unknown command: ${cmd}`);
+    console.error(`Run "stask --help" for usage.`);
+    process.exit(1);
+  }
+
+  const mod = await loader();
+  await mod.run(args.slice(1));
+}
+
+function printHelp() {
+  console.log(`stask — Unified task + Slack CLI
+
+Usage: stask <command> [args...]
+
+Mutation commands (DB + Slack transaction):
+  create --spec <path> --name "..." [--type Feature|Bug|Task]
+  approve <task-id>
+  transition <task-id> <status>
+  subtask create --parent <id> --name "..." --assign <agent>
+  subtask done <subtask-id>
+  qa <task-id> --report <path> --verdict PASS|FAIL
+  assign <task-id> <name>
+  spec-update <task-id> --spec <path>
+
+Read-only commands:
+  list [--status X] [--assignee Y] [--parent Z] [--json]
+  show <task-id> [--log]
+  log [<task-id>] [--limit N]
+  heartbeat <agent-name>
+  pr-status <task-id>
+  session claim|release|status <task-id> [--agent X] [--session-id Y]
+
+Sync commands:
+  sync                          Run one bidirectional sync cycle
+  sync-daemon start|stop|status Manage background sync daemon
+`);
+}
+
+main().catch(err => {
+  console.error(`FATAL: ${err.message}`);
+  process.exit(1);
+});

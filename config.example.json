@@ -1,0 +1,55 @@
+{
+  "specsDir": "/path/to/your/specs",
+  "projectRepoPath": "/path/to/your/git/repo",
+  "worktreeBaseDir": "/path/to/worktrees",
+  "staleSessionMinutes": 30,
+  "syncIntervalSeconds": 60,
+  "maxQaRetries": 3,
+
+  "human": {
+    "name": "YourName",
+    "slackUserId": "UXXXXXXXXXX",
+    "githubUsername": "your-github-username"
+  },
+
+  "agents": {
+    "lead-agent":   { "role": "lead",   "slackUserId": "UXXXXXXXXXX" },
+    "worker-1":     { "role": "worker", "slackUserId": "UXXXXXXXXXX" },
+    "worker-2":     { "role": "worker", "slackUserId": "UXXXXXXXXXX" },
+    "qa-agent":     { "role": "qa",     "slackUserId": "UXXXXXXXXXX" }
+  },
+
+  "slack": {
+    "listId": "FROM_ENV",
+    "columns": {
+      "name":          "ColXXXXXXXXX",
+      "task_id":       "ColXXXXXXXXX",
+      "status":        "ColXXXXXXXXX",
+      "assignee":      "ColXX",
+      "spec":          "ColXXXXXXXXX",
+      "type":          "ColXXXXXXXXX",
+      "worktree":      "ColXXXXXXXXX",
+      "pr":            "ColXXXXXXXXX",
+      "qa_report_1":   "ColXXXXXXXXX",
+      "qa_report_2":   "ColXXXXXXXXX",
+      "qa_report_3":   "ColXXXXXXXXX",
+      "completed":     "ColXX",
+      "spec_approved": "ColXXXXXXXXX",
+      "pr_status":     "ColXXXXXXXXX"
+    },
+    "statusOptions": {
+      "To-Do":                    "OptXXXXXXXXX",
+      "In-Progress":              "OptXXXXXXXXX",
+      "Testing":                  "OptXXXXXXXXX",
+      "Ready for Human Review":   "OptXXXXXXXXX",
+      "Blocked":                  "OptXXXXXXXXX",
+      "Done":                     "OptXXXXXXXXX"
+    },
+    "typeOptions": {
+      "Feature":     "OptXXXXXXXXX",
+      "Bug":         "OptXXXXXXXXX",
+      "Improvement": "OptXXXXXXXXX",
+      "Research":    "OptXXXXXXXXX"
+    }
+  }
+}

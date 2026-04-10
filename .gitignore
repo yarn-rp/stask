@@ -1,0 +1,12 @@
+node_modules/
+
+# Runtime data (lives in ~/.stask/)
+*.db
+*.db-wal
+*.db-shm
+.env
+config.json
+FILE_REGISTRY.json
+sync-daemon.pid
+logs/
+pr-status/

@@ -18,6 +18,12 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - run: npm ci
+
+      - name: Create test config
+        run: |
+          mkdir -p ~/.stask
+          cp config.example.json ~/.stask/config.json
+
       - run: npm test
 
       - name: Verify tag matches package.json version

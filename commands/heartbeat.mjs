@@ -11,7 +11,7 @@ import path from 'path';
 import { execFileSync, execSync } from 'child_process';
 import { CONFIG, LIB_DIR, getWorkspaceLibs } from '../lib/env.mjs';
 import { withDb } from '../lib/tx.mjs';
-import { syncTaskToSlack } from '../lib/slack-row.mjs';
+import { syncTaskToSlack, getThreadRef } from '../lib/slack-row.mjs';
 import { isTaskClaimable } from '../lib/session-tracker.mjs';
 import { getLeadAgent } from '../lib/roles.mjs';
 
@@ -348,7 +348,9 @@ These are NOT from ${CONFIG.human.name}. Send a Slack DM to ${CONFIG.human.name}
       }
 
       if (action && prompt) {
-        pendingTasks.push({ taskId, taskName: task['Task Name'], status, parent: task['Parent'], specFileId, action, prompt });
+        const threadRef = getThreadRef(db, isSubtask ? task['Parent'] : taskId);
+        const thread = threadRef ? { channelId: threadRef.channelId, threadTs: threadRef.threadTs } : null;
+        pendingTasks.push({ taskId, taskName: task['Task Name'], status, parent: task['Parent'], specFileId, action, prompt, thread });
       }
     }
 

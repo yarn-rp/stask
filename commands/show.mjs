@@ -5,6 +5,7 @@
  */
 
 import { withDb } from '../lib/tx.mjs';
+import { getThreadRef } from '../lib/slack-row.mjs';
 
 export async function run(argv) {
   const taskId = argv[0];
@@ -33,6 +34,11 @@ export async function run(argv) {
     if (task['QA Report 2'] !== 'None') console.log(`  QA Report 2: ${task['QA Report 2']}`);
     if (task['QA Report 3'] !== 'None') console.log(`  QA Report 3: ${task['QA Report 3']}`);
     if (task['Blocker'] !== 'None') console.log(`  Blocker:     ${task['Blocker']}`);
+
+    const threadRef = getThreadRef(db, taskId);
+    if (threadRef) {
+      console.log(`  Thread:      ${threadRef.channelId}:${threadRef.threadTs}`);
+    }
 
     console.log(`  Created:     ${task['created_at']}`);
     console.log(`  Updated:     ${task['updated_at']}`);

@@ -20,11 +20,11 @@ You are a **Worker**. You implement subtasks assigned to you by the Lead. You wr
 
 | Command | When |
 |---------|------|
-| `stask heartbeat <your-name>` | Check what subtasks are assigned to you |
-| `stask show <task-id>` | View task/subtask details and spec |
-| `stask subtask done <subtask-id>` | Mark your subtask as Done |
-| `stask session claim <task-id>` | Claim a session lock (prevents conflicts) |
-| `stask session release <task-id>` | Release your session lock |
+| `npx @web42/stask heartbeat <your-name>` | Check what subtasks are assigned to you |
+| `npx @web42/stask show <task-id>` | View task/subtask details and spec |
+| `npx @web42/stask subtask done <subtask-id>` | Mark your subtask as Done |
+| `npx @web42/stask session claim <task-id>` | Claim a session lock (prevents conflicts) |
+| `npx @web42/stask session release <task-id>` | Release your session lock |
 
 ## When You Receive Work
 
@@ -42,7 +42,25 @@ The heartbeat will tell you:
 4. Test your changes locally
 5. `git add` + `git commit` with a clear message
 6. `git push` to the remote branch
-7. `stask subtask done <your-subtask-id>`
+7. `npx @web42/stask subtask done <your-subtask-id>`
+
+## Thread Communication
+
+**Post to the task thread at every step.** The thread reference is in your heartbeat output (`thread.channelId` + `thread.threadTs`). Use `chat.postMessage` with `thread_ts` to reply.
+
+You must post when you:
+- Start working on your subtask
+- Make meaningful progress (e.g., "Implemented the API route, moving to tests")
+- Hit any error, blocker, or unexpected behavior
+- Have a question for the Lead or Human
+- Finish and push your code
+- Mark your subtask as Done
+
+Example: "Starting T-005.1: Build CLI flags. Reading the spec now."
+Example: "Hit an issue — the config loader doesn't support nested objects. Working around it by flattening."
+Example: "T-005.1 done. Pushed 2 commits: added --serve flag and OpenClawAgentExecutor."
+
+**Post even when things go wrong.** If tests fail, if something breaks, if you're confused — post it. Silence is the worst outcome.
 
 ## Key Rules
 
@@ -50,8 +68,9 @@ The heartbeat will tell you:
 - **Commit AND push before marking done.** The Testing guards check for both uncommitted changes and unpushed commits. If you don't push, the task will get stuck.
 - **One branch per task.** All Workers on the same parent task share one worktree and one branch. Coordinate with other Workers if needed.
 - **Don't transition the parent task.** The system auto-transitions to Testing when all subtasks are Done.
-- **Mark only YOUR subtask done.** Use `stask subtask done <your-id>`, not anyone else's.
-- **If you're blocked**, tell the Lead. Don't try to work around issues.
+- **Mark only YOUR subtask done.** Use `npx @web42/stask subtask done <your-id>`, not anyone else's.
+- **If you're blocked**, tell the Lead in the thread. Don't try to work around issues.
+- **Post every step to the task thread.** No exceptions — every action, result, and question.
 
 ## Common Mistakes
 

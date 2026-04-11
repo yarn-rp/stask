@@ -10,7 +10,7 @@ SQLite-backed task lifecycle management with Slack sync. Every operation goes th
 ## Core Rules
 
 1. **No task exists without a spec uploaded to Slack.** Every task must have a Spec value: `specs/<name>.md (F0XXXXXXXXX)`.
-2. **SQLite is the single source of truth.** Never edit `tracker.db` directly — use `stask` commands only.
+2. **SQLite is the single source of truth.** Never edit `tracker.db` directly — use `npx @web42/stask` commands only.
 3. **Every parent task gets its own worktree.** The guard system creates it automatically on In-Progress.
 4. **PR merge = Done.** The Human merges on GitHub, the system auto-completes the task.
 5. **DB + Slack are transactional.** If Slack sync fails, the DB rolls back.
@@ -74,32 +74,66 @@ Guards run automatically before transitions. Checks run first (read-only); if al
 
 | Command | Purpose |
 |---------|---------|
-| `stask create --spec <path> --name "..." [--type Feature\|Bug\|Task]` | Create task (auto-uploads spec to Slack) |
-| `stask approve <task-id>` | Human approves spec (reassigns to Lead) |
-| `stask transition <task-id> <status>` | Transition status (guards enforce prerequisites) |
-| `stask subtask create --parent <id> --name "..." --assign <agent>` | Create subtask under parent |
-| `stask subtask done <subtask-id>` | Worker marks subtask Done (auto-cascades parent) |
-| `stask qa <task-id> --report <path> --verdict PASS\|FAIL` | Submit QA verdict with report |
-| `stask assign <task-id> <name>` | Reassign a task |
-| `stask spec-update <task-id> --spec <path>` | Re-upload edited spec |
+| `npx @web42/stask create --spec <path> --name "..." [--type Feature\|Bug\|Task]` | Create task (auto-uploads spec to Slack) |
+| `npx @web42/stask approve <task-id>` | Human approves spec (reassigns to Lead) |
+| `npx @web42/stask transition <task-id> <status>` | Transition status (guards enforce prerequisites) |
+| `npx @web42/stask subtask create --parent <id> --name "..." --assign <agent>` | Create subtask under parent |
+| `npx @web42/stask subtask done <subtask-id>` | Worker marks subtask Done (auto-cascades parent) |
+| `npx @web42/stask qa <task-id> --report <path> --verdict PASS\|FAIL` | Submit QA verdict with report |
+| `npx @web42/stask assign <task-id> <name>` | Reassign a task |
+| `npx @web42/stask spec-update <task-id> --spec <path>` | Re-upload edited spec |
 
 ### Read-only commands
 
 | Command | Purpose |
 |---------|---------|
-| `stask list [--status X] [--assignee Y] [--json]` | List tasks (filterable) |
-| `stask show <task-id> [--log]` | Show task details + subtasks + audit log |
-| `stask log [<task-id>] [--limit N]` | View audit log |
-| `stask heartbeat <agent-name>` | Returns pending work for an agent (JSON) |
-| `stask pr-status <task-id>` | Poll PR for comments/merge status |
-| `stask session claim\|release\|status <task-id>` | Manage session locks |
+| `npx @web42/stask list [--status X] [--assignee Y] [--json]` | List tasks (filterable) |
+| `npx @web42/stask show <task-id> [--log]` | Show task details + subtasks + audit log |
+| `npx @web42/stask log [<task-id>] [--limit N]` | View audit log |
+| `npx @web42/stask heartbeat <agent-name>` | Returns pending work for an agent (JSON) |
+| `npx @web42/stask pr-status <task-id>` | Poll PR for comments/merge status |
+| `npx @web42/stask session claim\|release\|status <task-id>` | Manage session locks |
 
 ### Sync commands
 
 | Command | Purpose |
 |---------|---------|
-| `stask sync` | Run one bidirectional sync cycle |
-| `stask sync-daemon start\|stop\|status` | Manage background sync daemon |
+| `npx @web42/stask sync` | Run one bidirectional sync cycle |
+| `npx @web42/stask sync-daemon start\|stop\|status` | Manage background sync daemon |
+
+## Thread Communication
+
+Every task has a dedicated Slack thread linked to its list item. The thread reference (`channelId` + `threadTs`) is stored in the DB and included in `stask show` and `heartbeat` output.
+
+**All agents MUST post updates to the task thread at every step.** Use the Slack API `chat.postMessage` with the thread's `channel` and `thread_ts` to post replies. The thread is the single place for all task communication.
+
+### What to post
+
+- **Starting work** — "Starting work on T-XXX.2: Build login form"
+- **Progress updates** — "Implemented the auth middleware, moving to the UI components"
+- **Blockers or issues** — "Hit an issue: the API endpoint returns 500 on invalid tokens. Investigating."
+- **Errors or failures** — "Tests failing on login redirect. Stack trace: ..."
+- **Subtask completion** — "Subtask T-XXX.1 done. Pushed 3 commits to feature/xxx"
+- **QA results** — "QA PASS: all 5 acceptance criteria verified. Screenshots attached."
+- **Status transitions** — "Transitioning T-XXX to Testing"
+- **Questions** — "Question for @yan: should the invite expire after 7 days or 30 days?"
+
+### How to post
+
+The thread reference is in the heartbeat JSON as `thread.channelId` and `thread.threadTs`. Post using the Slack API:
+
+```
+POST https://slack.com/api/chat.postMessage
+{
+  "channel": "<thread.channelId>",
+  "thread_ts": "<thread.threadTs>",
+  "text": "<your update>"
+}
+```
+
+Use the `SLACK_TOKEN` from the environment for authorization.
+
+**Post even when things go wrong.** Failed builds, test errors, unexpected behavior — all of it goes in the thread. Silence is worse than bad news.
 
 ## Rules for All Agents
 
@@ -109,5 +143,6 @@ Guards run automatically before transitions. Checks run first (read-only); if al
 4. **Commit and push before marking done.** Guards will block Testing if you don't.
 5. **PR merge = Done.** Never manually transition to Done.
 6. **All PR comments go through the Human.** External comments need explicit triage.
-7. **Workers mark their own subtasks Done** via `stask subtask done <id>`.
+7. **Workers mark their own subtasks Done** via `npx @web42/stask subtask done <id>`.
 8. **Reference specs by Slack file ID** (e.g., `F0XXXXXXXXX`), never by local path.
+9. **Post every step to the task thread.** Every action, result, blocker, and question goes in the thread. No exceptions.

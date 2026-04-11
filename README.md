@@ -13,7 +13,7 @@ stask enforces a spec-first workflow where tasks flow through defined statuses (
 ## Install
 
 ```bash
-npm install -g stask
+npm install -g @web42/stask
 ```
 
 ## Setup

@@ -4,7 +4,7 @@
   "projectRepoPath": ".",
   "worktreeBaseDir": "~/.stask/worktrees/your-project-name",
   "staleSessionMinutes": 30,
-  "syncIntervalSeconds": 60,
+  "syncIntervalSeconds": 120,
   "maxQaRetries": 3,
 
   "human": {

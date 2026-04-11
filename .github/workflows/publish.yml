@@ -2,19 +2,22 @@ name: Publish to npm
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [main]
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # Skip if the commit was the version bump itself
+    if: "!contains(github.event.head_commit.message, 'chore: release')"
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           registry-url: https://registry.npmjs.org
 
       - run: npm ci
@@ -26,13 +29,12 @@ jobs:
 
       - run: npm test
 
-      - name: Verify tag matches package.json version
+      - name: Bump version and tag
         run: |
-          PKG_VERSION="v$(node -p 'require("./package.json").version')"
-          if [ "$PKG_VERSION" != "$GITHUB_REF_NAME" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match package.json version $PKG_VERSION"
-            exit 1
-          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          npm version patch -m "chore: release v%s"
+          git push --follow-tags
 
       - run: npm publish --access public
         env:

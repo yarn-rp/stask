@@ -15,7 +15,7 @@
     "config.example.json"
   ],
   "scripts": {
-    "test": "node --test test/*.test.mjs"
+    "test": "STASK_HOME=test/fixtures/.stask node --test test/*.test.mjs"
   },
   "keywords": [
     "cli",

@@ -1,7 +1,8 @@
 {
-  "specsDir": "/path/to/your/specs",
-  "projectRepoPath": "/path/to/your/git/repo",
-  "worktreeBaseDir": "/path/to/worktrees",
+  "project": "your-project-name",
+  "specsDir": "./specs",
+  "projectRepoPath": ".",
+  "worktreeBaseDir": "~/.stask/worktrees/your-project-name",
   "staleSessionMinutes": 30,
   "syncIntervalSeconds": 60,
   "maxQaRetries": 3,

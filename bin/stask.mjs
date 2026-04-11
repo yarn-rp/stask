@@ -23,7 +23,30 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { loadEnv, CONFIG } from '../lib/env.mjs';
+
+// ─── Extract --project flag before module loading ─────────────────
+// Must happen before env.mjs is imported since it resolves project root at import time.
+{
+  const idx = process.argv.indexOf('--project');
+  if (idx !== -1 && idx + 1 < process.argv.length) {
+    process.env.STASK_PROJECT = process.argv[idx + 1];
+    // Remove --project <name> from argv so commands don't see it
+    process.argv.splice(idx, 2);
+  }
+}
+
+// Commands that don't need a project context (work with global registry only)
+const NO_PROJECT_COMMANDS = new Set(['init', 'projects', 'heartbeat-all']);
+
+const _cmd = process.argv[2];
+if (NO_PROJECT_COMMANDS.has(_cmd)) {
+  // Skip project resolution — these commands handle it themselves
+  const mod = await import(`../commands/${_cmd}.mjs`);
+  await mod.run(process.argv.slice(3));
+  process.exit(0);
+}
+
+const { loadEnv, CONFIG } = await import('../lib/env.mjs');
 
 // Auto-load env before anything else
 loadEnv();
@@ -44,7 +67,6 @@ function ensureSyncDaemon() {
 }
 
 // Don't auto-start for sync-daemon commands (avoid recursion) or read-only queries
-const _cmd = process.argv[2];
 if (_cmd && _cmd !== 'sync-daemon' && _cmd !== '--help' && _cmd !== '-h') {
   ensureSyncDaemon();
 }
@@ -68,6 +90,8 @@ const COMMANDS = {
   'assign':         () => import('../commands/assign.mjs'),
   'sync':           () => import('../commands/sync.mjs'),
   'sync-daemon':    () => import('../commands/sync-daemon.mjs'),
+  // Multi-project commands (also handled as NO_PROJECT_COMMANDS above for init/projects/heartbeat-all)
+  'heartbeat-all':  () => import('../commands/heartbeat-all.mjs'),
 };
 
 const SUBTASK_COMMANDS = {
@@ -148,6 +172,14 @@ Read-only commands:
 Sync commands:
   sync                          Run one bidirectional sync cycle
   sync-daemon start|stop|status Manage background sync daemon
+
+Multi-project commands:
+  init <name> --repo <path>     Create a new stask project
+  projects [show <name>]        List/show registered projects
+  heartbeat-all <agent-name>    Get pending work across all projects
+
+Global flags:
+  --project <name>              Target a specific project (otherwise auto-detected from cwd)
 `);
 }
 

@@ -9,7 +9,7 @@ import fs from 'fs';
 import { createHash } from 'crypto';
 import { CONFIG, getWorkspaceLibs } from '../lib/env.mjs';
 import { withTransaction } from '../lib/tx.mjs';
-import { syncTaskToSlack } from '../lib/slack-row.mjs';
+import { syncTaskToSlack, setThreadRef } from '../lib/slack-row.mjs';
 
 function parseArgs(argv) {
   const args = {};
@@ -19,6 +19,31 @@ function parseArgs(argv) {
     else if (argv[i] === '--type' && argv[i + 1]) args.type = argv[++i];
   }
   return args;
+}
+
+/**
+ * Discover the list item's comment thread on the list channel.
+ * Slack Lists internally use a channel (list ID with F→C prefix swap).
+ * Each list item gets a thread whose ts shares the same epoch second
+ * as the item's date_created.
+ *
+ * @param {object} slackApi - Slack API module
+ * @param {string} listChannelId - List channel ID (C-prefixed)
+ * @param {number} itemDateCreated - Item's date_created (Unix epoch)
+ */
+async function discoverListItemThread(slackApi, listChannelId, itemDateCreated) {
+  const epoch = String(itemDateCreated);
+  const oldest = String(itemDateCreated - 2);
+  const latest = String(itemDateCreated + 5);
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const result = await slackApi.getChannelHistory(listChannelId, { oldest, latest, limit: 10 });
+    const messages = result.messages || [];
+    const match = messages.find(m => m.ts && m.ts.startsWith(epoch + '.'));
+    if (match) return match.ts;
+    await new Promise(r => setTimeout(r, 1000));
+  }
+  return null;
 }
 
 export async function run(argv) {
@@ -83,6 +108,30 @@ export async function run(argv) {
       return slackOps;
     }
   );
+
+  // Post-commit: discover list item thread and post creation message (best-effort)
+  try {
+    const listChannelId = CONFIG.slack.listId.replace(/^F/, 'C');
+    const db = libs.trackerDb.getDb();
+    // Get the Slack item's date_created (Unix epoch) to match the thread ts
+    const { getSlackRowId } = await import('../lib/slack-row.mjs');
+    const rowId = getSlackRowId(db, result.taskId);
+    const itemInfo = await libs.slackApi.slackApiRequest('POST', '/slackLists.items.info', {
+      list_id: CONFIG.slack.listId, id: rowId,
+    });
+    const dateCreated = itemInfo.record?.date_created;
+    if (dateCreated) {
+      const threadTs = await discoverListItemThread(libs.slackApi, listChannelId, dateCreated);
+      if (threadTs) {
+        const humanMention = `<@${CONFIG.human.slackUserId}>`;
+        const msg = `Creating this thread to discuss *${result.taskId}: ${args.name}*. This will be the thread where we post updates and talk about this task.\n\n${humanMention} spec is ready for your review. Let me know what you think!`;
+        await libs.slackApi.postMessage(listChannelId, msg, { threadTs });
+        setThreadRef(db, result.taskId, listChannelId, threadTs);
+      }
+    }
+  } catch (err) {
+    console.error(`WARNING: Thread linking failed: ${err.message}`);
+  }
 
   console.log(`Created ${result.taskId}: "${args.name}" | Status: To-Do | Assigned: ${CONFIG.human.name} | Spec: ${fileId}`);
 }

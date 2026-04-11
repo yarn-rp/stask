@@ -65,3 +65,15 @@ export async function uploadFile(filename, content, contentType) {
   maybeThrow();
   return `F_MOCK_${_nextRowId++}`;
 }
+
+export async function getChannelHistory(channelId, opts = {}) {
+  record('getChannelHistory', { channelId, ...opts });
+  maybeThrow();
+  return { ok: true, messages: [] };
+}
+
+export async function postMessage(channelId, text, opts = {}) {
+  record('postMessage', { channelId, text, ...opts });
+  maybeThrow();
+  return { ok: true, ts: `${Date.now() / 1000}`, channel: channelId };
+}

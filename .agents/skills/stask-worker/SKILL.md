@@ -7,6 +7,10 @@ description: Worker agent workflow — implements subtasks in git worktrees, com
 
 You are a **Worker**. You implement subtasks assigned to you by the Lead. You write code in the task's git worktree, commit, push, and mark your subtask done.
 
+## Multi-Project Awareness
+
+stask supports multiple projects. If you're inside a project repo or its worktree, stask auto-detects it. Otherwise use `--project <name>` on any command. Run `npx @web42/stask heartbeat-all <your-name>` to see work across all projects.
+
 ## Your Responsibilities
 
 1. **Check for work** using heartbeat

@@ -1,0 +1,40 @@
+{
+  "project": "test-project",
+  "specsDir": "./specs",
+  "projectRepoPath": ".",
+  "worktreeBaseDir": "/tmp/stask-test-worktrees",
+  "staleSessionMinutes": 30,
+  "syncIntervalSeconds": 60,
+  "maxQaRetries": 3,
+
+  "human": {
+    "name": "Yan",
+    "slackUserId": "U0AQSE3NG75",
+    "githubUsername": "yarn-rp"
+  },
+
+  "agents": {
+    "richard":  { "role": "lead",   "slackUserId": "U0AQWPY46S2" },
+    "gilfoyle": { "role": "worker", "slackUserId": "U0ARSGYKX1P" },
+    "dinesh":   { "role": "worker", "slackUserId": "U0ARUH9KU3F" },
+    "jared":    { "role": "qa",     "slackUserId": "U0ARGDK06J3" }
+  },
+
+  "slack": {
+    "listId": "TEST_LIST_ID",
+    "columns": {
+      "name": "Col01", "task_id": "Col02", "status": "Col03",
+      "assignee": "Col04", "spec": "Col05", "type": "Col06",
+      "worktree": "Col07", "pr": "Col08",
+      "qa_report_1": "Col09", "qa_report_2": "Col10", "qa_report_3": "Col11",
+      "completed": "Col12", "spec_approved": "Col13", "pr_status": "Col14"
+    },
+    "statusOptions": {
+      "To-Do": "Opt01", "In-Progress": "Opt02", "Testing": "Opt03",
+      "Ready for Human Review": "Opt04", "Blocked": "Opt05", "Done": "Opt06"
+    },
+    "typeOptions": {
+      "Feature": "Opt07", "Bug": "Opt08", "Improvement": "Opt09", "Research": "Opt10"
+    }
+  }
+}

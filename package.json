@@ -15,7 +15,9 @@
     "config.example.json"
   ],
   "scripts": {
-    "test": "node --test test/*.test.mjs"
+    "test": "STASK_HOME=test/fixtures/.stask node --test test/*.test.mjs",
+    "test:e2e": "node --test test/multi-project.test.mjs",
+    "test:unit": "STASK_HOME=test/fixtures/.stask node --test test/cascade.test.mjs test/lifecycle.test.mjs test/roles.test.mjs test/session.test.mjs test/slack-row.test.mjs test/transitions.test.mjs test/tx.test.mjs"
   },
   "keywords": [
     "cli",

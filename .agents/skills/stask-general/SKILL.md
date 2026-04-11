@@ -7,6 +7,26 @@ description: Task lifecycle framework — spec-first workflow, Slack sync, statu
 
 SQLite-backed task lifecycle management with Slack sync. Every operation goes through the `stask` CLI — the database enforces all lifecycle rules via triggers and constraints, and every mutation syncs to Slack atomically.
 
+## Multi-Project Support
+
+stask supports multiple projects. Each project lives in a repo with a `.stask/` folder at its root (like `.git/`).
+
+- **Auto-detection:** stask walks up from cwd to find `.stask/config.json`. If you're in a project repo or its worktree, it auto-detects.
+- **Explicit selection:** Use `--project <name>` flag on any command to target a specific project.
+- **Project registry:** `npx @web42/stask projects` lists all registered projects.
+- **Cross-project heartbeat:** `npx @web42/stask heartbeat-all <agent>` returns pending work across all projects.
+- **New project:** `npx @web42/stask init <name> --repo <path>` scaffolds a new project.
+- **Secrets:** `SLACK_TOKEN` comes from env var or `~/.stask/config.json` (no `.env` files).
+
+### Multi-project commands
+
+| Command | Purpose |
+|---------|---------|
+| `npx @web42/stask init <name> --repo <path>` | Create a new stask project |
+| `npx @web42/stask projects [show <name>]` | List/show registered projects |
+| `npx @web42/stask heartbeat-all <agent-name>` | Get pending work across all projects |
+| `--project <name>` | Global flag — target a specific project |
+
 ## Core Rules
 
 1. **No task exists without a spec uploaded to Slack.** Every task must have a Spec value: `specs/<name>.md (F0XXXXXXXXX)`.
@@ -103,7 +123,7 @@ Guards run automatically before transitions. Checks run first (read-only); if al
 
 ## Thread Communication
 
-Every task has a dedicated Slack thread linked to its list item. The thread reference (`channelId` + `threadTs`) is stored in the DB and included in `stask show` and `heartbeat` output.
+Every task has a dedicated Slack thread linked to its list item. The thread reference (`channelId` + `threadTs`) is stored in the DB and included in `npx @web42/stask show` and `heartbeat` output.
 
 **All agents MUST post updates to the task thread at every step.** Use the Slack API `chat.postMessage` with the thread's `channel` and `thread_ts` to post replies. The thread is the single place for all task communication.
 
@@ -137,7 +157,7 @@ Use the `SLACK_TOKEN` from the environment for authorization.
 
 ## Rules for All Agents
 
-1. **Never edit tracker.db directly.** Use `stask` commands only.
+1. **Never edit tracker.db directly.** Use `npx @web42/stask` commands only.
 2. **Every task needs a spec.** No exceptions.
 3. **Work in the task worktree.** Never in the main repo checkout.
 4. **Commit and push before marking done.** Guards will block Testing if you don't.

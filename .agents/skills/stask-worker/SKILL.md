@@ -32,7 +32,7 @@ stask supports multiple projects. If you're inside a project repo or its worktre
 
 ## When You Receive Work
 
-### Subtask Assigned (In-Progress, assigned to you)
+### Single Subtask (action: build)
 
 The heartbeat will tell you:
 - The subtask ID and name
@@ -47,6 +47,22 @@ The heartbeat will tell you:
 5. `git add` + `git commit` with a clear message
 6. `git push` to the remote branch
 7. `npx @web42/stask subtask done <your-subtask-id>`
+
+### Multiple Subtasks (action: build-batch)
+
+When heartbeat returns multiple subtasks grouped together, you implement them all **sequentially in a single session**:
+
+1. `cd` to the worktree path from the heartbeat
+2. Read the spec to understand the full context
+3. For EACH subtask, in the listed order:
+   a. Implement the changes for that subtask
+   b. `git add` + `git commit` with a message referencing the subtask ID
+   c. `git push`
+   d. `npx @web42/stask subtask done <subtask-id>`
+   e. Post progress to the task thread
+   f. Run `/compact` to free up context before starting the next subtask
+
+**IMPORTANT:** Complete each subtask fully (commit, push, mark done) before starting the next. Do not skip ahead or work on multiple subtasks simultaneously.
 
 ## Thread Communication
 

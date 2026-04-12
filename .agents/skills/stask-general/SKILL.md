@@ -39,9 +39,9 @@ stask supports multiple projects. Each project lives in a repo with a `.stask/` 
 
 | Role | Responsibility |
 |------|---------------|
-| **Human** | Approves specs (via Slack checkbox), reviews PRs on GitHub, merges |
+| **Human** | Approves specs (via `spec_approved` checkbox in Slack — the only approval path), reviews PRs on GitHub, merges |
 | **Lead** | Creates subtasks, delegates, coordinates fixes |
-| **Worker(s)** | Implements subtasks in worktrees, marks them done |
+| **Worker(s)** | Implements subtasks in worktrees (batched in a single session per parent), marks them done |
 | **QA** | Tests against acceptance criteria, submits pass/fail verdict |
 
 ## Task Lifecycle
@@ -95,7 +95,7 @@ Guards run automatically before transitions. Checks run first (read-only); if al
 | Command | Purpose |
 |---------|---------|
 | `npx @web42/stask create --spec <path> --name "..." [--type Feature\|Bug\|Task]` | Create task (auto-uploads spec to Slack) |
-| `npx @web42/stask approve <task-id>` | Human approves spec (reassigns to Lead) |
+| ~~approve~~ | Removed — approval happens via `spec_approved` checkbox in Slack only |
 | `npx @web42/stask transition <task-id> <status>` | Transition status (guards enforce prerequisites) |
 | `npx @web42/stask subtask create --parent <id> --name "..." --assign <agent>` | Create subtask under parent |
 | `npx @web42/stask subtask done <subtask-id>` | Worker marks subtask Done (auto-cascades parent) |
@@ -166,3 +166,5 @@ Use the `SLACK_TOKEN` from the environment for authorization.
 7. **Workers mark their own subtasks Done** via `npx @web42/stask subtask done <id>`.
 8. **Reference specs by Slack file ID** (e.g., `F0XXXXXXXXX`), never by local path.
 9. **Post every step to the task thread.** Every action, result, blocker, and question goes in the thread. No exceptions.
+10. **Subtasks must match the spec.** Only the Lead creates subtasks, and only those listed in the spec's Subtasks section. Fix subtasks (after QA failure) are the only exception.
+11. **No CLI approval.** There is no `stask approve` command. Approval happens exclusively via the `spec_approved` checkbox in Slack.

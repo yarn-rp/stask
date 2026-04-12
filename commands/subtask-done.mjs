@@ -9,6 +9,7 @@
 import { getWorkspaceLibs } from '../lib/env.mjs';
 import { withTransaction } from '../lib/tx.mjs';
 import { syncTaskToSlack } from '../lib/slack-row.mjs';
+import { postThreadUpdate } from '../lib/thread-notify.mjs';
 
 const TRIGGER_SQL = `
   CREATE TRIGGER validate_status_transition
@@ -60,6 +61,8 @@ export async function run(argv) {
   );
 
   console.log(`${subtaskId}: "${subtask['Task Name']}" | In-Progress → Done`);
+
+  await postThreadUpdate(subtaskId, `*${subtaskId}* completed: "${subtask['Task Name']}" marked *Done*`);
 
   // Check siblings — auto-transition parent if all Done
   const siblings = libs.trackerDb.getSubtasks(parentId);

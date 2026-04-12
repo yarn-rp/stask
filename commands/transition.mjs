@@ -15,6 +15,7 @@ import { withTransaction } from '../lib/tx.mjs';
 import { syncTaskToSlack } from '../lib/slack-row.mjs';
 import { getAutoAssign } from '../lib/roles.mjs';
 import { runGuards } from '../lib/guards.mjs';
+import { postThreadUpdate } from '../lib/thread-notify.mjs';
 
 const TRIGGER_SQL = `
   CREATE TRIGGER validate_status_transition
@@ -140,4 +141,8 @@ export async function run(argv) {
   }
 
   console.log(`${taskId}: "${task['Task Name']}" | ${oldStatus} → ${newStatus} | Assigned: ${autoAssign || task['Assigned To']}`);
+
+  // Post thread notification (best-effort, after commit)
+  const assignee = autoAssign || task['Assigned To'];
+  await postThreadUpdate(taskId, `*${taskId}* status changed: *${oldStatus}* → *${newStatus}* | Assigned to *${assignee}*`);
 }

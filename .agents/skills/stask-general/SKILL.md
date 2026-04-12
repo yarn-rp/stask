@@ -138,15 +138,26 @@ Every task has a dedicated Slack thread linked to its list item. The thread refe
 - **Status transitions** — "Transitioning T-XXX to Testing"
 - **Questions** — "Question for @yan: should the invite expire after 7 days or 30 days?"
 
+### How to get the thread reference
+
+Every task thread has a `channelId` and `threadTs`. You can get them from:
+
+1. **Heartbeat output** — the `thread` field in each pending task: `thread.channelId` + `thread.threadTs`
+2. **`npx @web42/stask show <task-id>`** — prints `Thread: <channelId>:<threadTs>` in the task details
+
+Always use the **parent task's** thread for subtask communication — all subtasks share the parent's thread.
+
+If you don't have the thread reference from heartbeat (e.g. you're working outside the heartbeat flow), run `stask show <task-id>` to get it.
+
 ### How to post
 
-The thread reference is in the heartbeat JSON as `thread.channelId` and `thread.threadTs`. Post using the Slack API:
+Post using the Slack API with the thread reference:
 
 ```
 POST https://slack.com/api/chat.postMessage
 {
-  "channel": "<thread.channelId>",
-  "thread_ts": "<thread.threadTs>",
+  "channel": "<channelId>",
+  "thread_ts": "<threadTs>",
   "text": "<your update>"
 }
 ```

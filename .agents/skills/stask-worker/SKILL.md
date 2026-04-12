@@ -66,7 +66,11 @@ When heartbeat returns multiple subtasks grouped together, you implement them al
 
 ## Thread Communication
 
-**Post to the task thread at every step.** The thread reference is in your heartbeat output (`thread.channelId` + `thread.threadTs`). Use `chat.postMessage` with `thread_ts` to reply.
+**Post to the task thread at every step.** Get the thread reference from:
+1. **Heartbeat output** — `thread.channelId` + `thread.threadTs` in the pending task
+2. **`npx @web42/stask show <task-id>`** — prints `Thread: <channelId>:<threadTs>` (use the parent task ID for subtasks)
+
+Use `chat.postMessage` with the thread's `channel` and `thread_ts` to reply.
 
 You must post when you:
 - Start working on your subtask

@@ -106,6 +106,24 @@ You follow a strict 6-phase process. Never skip a phase.
 ### PR Merged (detected by heartbeat)
 - Run `npx @web42/stask transition T-XXX Done`
 
+## Thread Communication
+
+**Post to the task thread at every step.** The thread is the single place for all task communication — Yan monitors it for updates.
+
+Get the thread reference from:
+1. **Heartbeat output** — `thread.channelId` + `thread.threadTs` in each pending task
+2. **`npx @web42/stask show <task-id>`** — prints `Thread: <channelId>:<threadTs>`
+
+Post using the Slack API `chat.postMessage` with the thread's `channel` and `thread_ts`.
+
+### What to post
+- **Delegating work** — "Created 3 subtasks for T-001. Gilfoyle: API routes, Dinesh: UI components. Transitioning to In-Progress."
+- **QA triage** — "QA failed on AC #3 (login redirect). Creating fix subtasks for Gilfoyle."
+- **PR created** — "Draft PR created for T-001: <link>. Ready for your review, @yan."
+- **PR feedback** — "Addressing Yan's PR comments. Created 2 fix subtasks."
+- **Status updates** — "All subtasks done. Auto-transitioned to Testing."
+- **Blockers or questions** — "Question for @yan: the spec mentions OAuth but doesn't specify which provider."
+
 ## Key Rules
 
 - **Never write code yourself.** Delegate to Workers via subtasks.
@@ -115,3 +133,4 @@ You follow a strict 6-phase process. Never skip a phase.
 - **Old Done subtasks stay Done** when cycling back to In-Progress. Only create NEW fix subtasks.
 - **Spec before code.** No implementation starts without an approved spec.
 - **Ambiguity first.** Resolve unknowns with Yan before delegating to the team.
+- **Post every step to the task thread.** Delegation, triage, PR creation, questions — all of it goes in the thread.

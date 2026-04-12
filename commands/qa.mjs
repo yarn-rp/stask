@@ -12,6 +12,7 @@ import { CONFIG, getWorkspaceLibs } from '../lib/env.mjs';
 import { withTransaction } from '../lib/tx.mjs';
 import { syncTaskToSlack } from '../lib/slack-row.mjs';
 import { getAutoAssign, getLeadAgent } from '../lib/roles.mjs';
+import { postThreadUpdate } from '../lib/thread-notify.mjs';
 
 const TRIGGER_SQL = `
   CREATE TRIGGER validate_status_transition
@@ -180,4 +181,8 @@ export async function run(argv) {
   );
 
   console.log(`${args.taskId}: QA ${verdict} | Testing → ${newStatus} | Attachments: ${allFileIds.length}`);
+
+  const verdictEmoji = verdict === 'PASS' ? 'PASSED' : verdict === 'FAIL' ? 'FAILED' : 'PASSED WITH ISSUES';
+  const assigneeMsg = newAssignee ? ` | Assigned to *${newAssignee}*` : '';
+  await postThreadUpdate(args.taskId, `*${args.taskId}* QA *${verdictEmoji}*: Testing → *${newStatus}*${assigneeMsg}`);
 }

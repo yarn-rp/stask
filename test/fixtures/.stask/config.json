@@ -30,7 +30,7 @@
       "completed": "Col12", "spec_approved": "Col13", "pr_status": "Col14"
     },
     "statusOptions": {
-      "To-Do": "Opt01", "In-Progress": "Opt02", "Testing": "Opt03",
+      "Backlog": "Opt00", "To-Do": "Opt01", "In-Progress": "Opt02", "Testing": "Opt03",
       "Ready for Human Review": "Opt04", "Blocked": "Opt05", "Done": "Opt06"
     },
     "typeOptions": {

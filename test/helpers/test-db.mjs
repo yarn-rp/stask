@@ -12,11 +12,11 @@ PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS tasks (
   task_id       TEXT PRIMARY KEY,
   task_name     TEXT NOT NULL,
-  status        TEXT NOT NULL DEFAULT 'To-Do'
-                CHECK (status IN ('To-Do','In-Progress','Testing',
+  status        TEXT NOT NULL DEFAULT 'Backlog'
+                CHECK (status IN ('Backlog','To-Do','In-Progress','Testing',
                        'Ready for Human Review','Blocked','Done')),
   assigned_to   TEXT,
-  spec          TEXT NOT NULL,
+  spec          TEXT,
   qa_report_1   TEXT,
   qa_report_2   TEXT,
   qa_report_3   TEXT,
@@ -67,6 +67,8 @@ BEGIN
   SELECT CASE
     WHEN OLD.status = 'Done' THEN
       RAISE(ABORT, 'Cannot transition from Done (terminal state)')
+    WHEN OLD.status = 'Backlog' AND NEW.status NOT IN ('To-Do','Blocked') THEN
+      RAISE(ABORT, 'Backlog can only transition to To-Do or Blocked')
     WHEN OLD.status = 'To-Do' AND NEW.status NOT IN ('In-Progress','Blocked') THEN
       RAISE(ABORT, 'To-Do can only transition to In-Progress or Blocked')
     WHEN OLD.status = 'In-Progress' AND NEW.status NOT IN ('Testing','Blocked') THEN
@@ -75,8 +77,8 @@ BEGIN
       RAISE(ABORT, 'Testing can only transition to Ready for Human Review, In-Progress, or Blocked')
     WHEN OLD.status = 'Ready for Human Review' AND NEW.status NOT IN ('Done','In-Progress','Blocked') THEN
       RAISE(ABORT, 'Ready for Human Review can only transition to Done, In-Progress, or Blocked')
-    WHEN OLD.status = 'Blocked' AND NEW.status NOT IN ('To-Do','In-Progress','Testing','Ready for Human Review') THEN
-      RAISE(ABORT, 'Blocked can transition to To-Do, In-Progress, Testing, or Ready for Human Review')
+    WHEN OLD.status = 'Blocked' AND NEW.status NOT IN ('Backlog','To-Do','In-Progress','Testing','Ready for Human Review') THEN
+      RAISE(ABORT, 'Blocked can transition to Backlog, To-Do, In-Progress, Testing, or Ready for Human Review')
   END;
 END;
 
@@ -169,6 +171,22 @@ export function updateTask(db, taskId, fields) {
  * Useful for testing transitions FROM various states.
  */
 export function createTaskAtStatus(db, taskId, status, extra = {}) {
+  // For Backlog, insert directly with no spec required
+  if (status === 'Backlog') {
+    const defaults = {
+      task_name: 'Test Task',
+      status: 'Backlog',
+      assigned_to: null,
+      type: 'Feature',
+    };
+    const merged = { task_id: taskId, ...defaults, ...extra };
+    const cols = Object.keys(merged);
+    const placeholders = cols.map(() => '?').join(', ');
+    db.prepare(`INSERT INTO tasks (${cols.join(', ')}) VALUES (${placeholders})`)
+      .run(...Object.values(merged));
+    return;
+  }
+
   // Start with To-Do, then direct-update to target (bypassing triggers for setup)
   insertTask(db, { task_id: taskId, ...extra });
 

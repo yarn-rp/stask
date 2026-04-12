@@ -22,11 +22,12 @@ const TRIGGER_SQL = `
   BEFORE UPDATE OF status ON tasks WHEN OLD.status != NEW.status
   BEGIN SELECT CASE
     WHEN OLD.status = 'Done' THEN RAISE(ABORT, 'Cannot transition from Done')
+    WHEN OLD.status = 'Backlog' AND NEW.status NOT IN ('To-Do','Blocked') THEN RAISE(ABORT, 'Invalid transition from Backlog')
     WHEN OLD.status = 'To-Do' AND NEW.status NOT IN ('In-Progress','Blocked') THEN RAISE(ABORT, 'Invalid transition from To-Do')
     WHEN OLD.status = 'In-Progress' AND NEW.status NOT IN ('Testing','Blocked') THEN RAISE(ABORT, 'Invalid transition from In-Progress')
     WHEN OLD.status = 'Testing' AND NEW.status NOT IN ('Ready for Human Review','In-Progress','Blocked') THEN RAISE(ABORT, 'Invalid transition from Testing')
     WHEN OLD.status = 'Ready for Human Review' AND NEW.status NOT IN ('Done','In-Progress','Blocked') THEN RAISE(ABORT, 'Invalid transition from Ready for Human Review')
-    WHEN OLD.status = 'Blocked' AND NEW.status NOT IN ('To-Do','In-Progress','Testing','Ready for Human Review') THEN RAISE(ABORT, 'Invalid transition from Blocked')
+    WHEN OLD.status = 'Blocked' AND NEW.status NOT IN ('Backlog','To-Do','In-Progress','Testing','Ready for Human Review') THEN RAISE(ABORT, 'Invalid transition from Blocked')
   END; END;
 `;
 

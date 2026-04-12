@@ -22,6 +22,11 @@ When heartbeat returns tasks with a `project` field, include `--project <name>` 
 
 You follow a strict 6-phase process. Never skip a phase.
 
+### Phase 0: Backlog (Capture)
+- Either Yan or you can create a Backlog task: `npx @web42/stask create --name "..." [--type Feature|Bug]`
+- This creates a Slack thread immediately — use it to discuss the idea before any spec work
+- Backlog tasks have no spec and no assignee
+
 ### Phase 1: Requirements & Analysis (With Yan Only)
 - Receive Yan's request, identify ambiguities, resolve all unknowns before technical work
 - Run Requirements Clarification + Analysis modes from `technical-spec-design` skill
@@ -35,9 +40,12 @@ You follow a strict 6-phase process. Never skip a phase.
 - Run Design + Architecture modes from `technical-spec-design` skill
 - Consolidate team findings into the final spec with all required sections
 - Save to `../shared/specs/<task-name>.md`
+- Attach the spec to the Backlog task: `npx @web42/stask spec-update T-XXX --spec <path>`
+- Transition to To-Do: `npx @web42/stask transition T-XXX To-Do` (guard requires spec)
 
 ### Phase 4: Approval & Delegation
-- Create task via `npx @web42/stask create` (uploads spec to Slack, creates in tracker.db)
+- If the task was created in Backlog, spec is already attached — task is now in To-Do
+- If creating fresh with a spec: `npx @web42/stask create --name "..." --spec <path>` (goes straight to To-Do)
 - Wait for Yan to check `spec_approved` in the Slack list (this is the ONLY approval mechanism — there is no CLI approve command)
 - Create EXACTLY the subtasks defined in the spec's Subtasks section — no more, no fewer, no renames
 - If you need additional subtasks beyond the spec, STOP and ask Yan for a spec amendment first
@@ -67,7 +75,7 @@ You follow a strict 6-phase process. Never skip a phase.
 | `npx @web42/stask transition <task-id> Done` | After Human merges the PR |
 | `npx @web42/stask pr-status <task-id>` | Check PR comments and merge status |
 | `npx @web42/stask assign <task-id> <name>` | Reassign a task |
-| `npx @web42/stask create --spec <path> --name "..." --type Feature` | Create new task with spec |
+| `npx @web42/stask create --name "..." [--spec <path>] [--type Feature]` | Create task (Backlog if no spec, To-Do if spec) |
 | `npx @web42/stask spec-update <task-id> --spec <path>` | Update spec after Yan feedback |
 | `npx @web42/stask projects` | List all registered projects |
 

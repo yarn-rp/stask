@@ -29,7 +29,7 @@ stask supports multiple projects. Each project lives in a repo with a `.stask/` 
 
 ## Core Rules
 
-1. **No task exists without a spec uploaded to Slack.** Every task must have a Spec value: `specs/<name>.md (F0XXXXXXXXX)`.
+1. **Backlog tasks start without a spec.** Once a spec is attached (`stask spec-update`), the task can move to To-Do. From To-Do onward, every task must have a Spec value: `specs/<name>.md (F0XXXXXXXXX)`.
 2. **SQLite is the single source of truth.** Never edit `tracker.db` directly — use `npx @web42/stask` commands only.
 3. **Every parent task gets its own worktree.** The guard system creates it automatically on In-Progress.
 4. **PR merge = Done.** The Human merges on GitHub, the system auto-completes the task.
@@ -47,8 +47,10 @@ stask supports multiple projects. Each project lives in a repo with a `.stask/` 
 ## Task Lifecycle
 
 ```
-Lead writes spec -> uploads to Slack -> creates task (assigned to Human)
-    -> Human approves spec -> assigned to Lead
+Anyone creates task (name + type only) -> Backlog (unassigned, no spec)
+    -> Discussion happens in the Slack thread
+    -> Spec written + attached via spec-update -> transition to To-Do (guard: requires spec)
+    -> Human approves spec (checkbox in Slack) -> assigned to Lead
     -> Lead creates subtasks -> delegates to Workers
     -> Lead transitions to In-Progress -> worktree created automatically (guard)
     -> Workers work in the task worktree (feature branch)
@@ -67,6 +69,7 @@ Guards run automatically before transitions. Checks run first (read-only); if al
 
 | Transition | Guard | Type | What it does |
 |---|---|---|---|
+| -> To-Do | `require_spec` | check | Task must have a spec attached |
 | -> In-Progress | `require_approved` | check | Task must not be assigned to Human |
 | -> In-Progress | `setup_worktree` | setup | Creates git worktree + feature branch |
 | -> Testing | `all_subtasks_done` | check | Every subtask must be Done |
@@ -80,7 +83,8 @@ Guards run automatically before transitions. Checks run first (read-only); if al
 
 | Status | Meaning | Assigned To |
 |--------|---------|-------------|
-| To-Do (Human) | Spec written, awaiting approval | Human |
+| Backlog | Idea captured, no spec yet — discuss in thread | Unassigned |
+| To-Do (Human) | Spec attached, awaiting approval | Human |
 | To-Do (Lead) | Spec approved, Lead creating subtasks | Lead |
 | In-Progress | Workers building subtasks in worktree | Parent: Lead, Subtasks: Workers |
 | Testing | QA testing with evidence | QA |
@@ -94,7 +98,7 @@ Guards run automatically before transitions. Checks run first (read-only); if al
 
 | Command | Purpose |
 |---------|---------|
-| `npx @web42/stask create --spec <path> --name "..." [--type Feature\|Bug\|Task]` | Create task (auto-uploads spec to Slack) |
+| `npx @web42/stask create --name "..." [--spec <path>] [--type Feature\|Bug\|Task]` | Create task (Backlog if no spec, To-Do if spec provided) |
 | ~~approve~~ | Removed — approval happens via `spec_approved` checkbox in Slack only |
 | `npx @web42/stask transition <task-id> <status>` | Transition status (guards enforce prerequisites) |
 | `npx @web42/stask subtask create --parent <id> --name "..." --assign <agent>` | Create subtask under parent |
@@ -175,7 +179,7 @@ Use the `SLACK_TOKEN` from the environment for authorization.
 5. **PR merge = Done.** Never manually transition to Done.
 6. **All PR comments go through the Human.** External comments need explicit triage.
 7. **Workers mark their own subtasks Done** via `npx @web42/stask subtask done <id>`.
-8. **Reference specs by Slack file ID** (e.g., `F0XXXXXXXXX`), never by local path.
+8. **Reference specs by Slack file ID** (e.g., `F0XXXXXXXXX`), never by local path. Backlog tasks have no spec until one is attached.
 9. **Post every step to the task thread.** Every action, result, blocker, and question goes in the thread. No exceptions.
 10. **Subtasks must match the spec.** Only the Lead creates subtasks, and only those listed in the spec's Subtasks section. Fix subtasks (after QA failure) are the only exception.
 11. **No CLI approval.** There is no `stask approve` command. Approval happens exclusively via the `spec_approved` checkbox in Slack.

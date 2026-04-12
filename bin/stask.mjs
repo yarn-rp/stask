@@ -155,7 +155,7 @@ function printHelp() {
 Usage: stask <command> [args...]
 
 Mutation commands (DB + Slack transaction):
-  create --spec <path> --name "..." [--type Feature|Bug|Task]
+  create --name "..." [--spec <path>] [--type Feature|Bug|Task]
   transition <task-id> <status>
   subtask create --parent <id> --name "..." --assign <agent>
   subtask done <subtask-id>

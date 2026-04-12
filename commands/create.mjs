@@ -1,7 +1,9 @@
 /**
- * stask create — Create a new task (uploads spec to Slack).
+ * stask create — Create a new task.
  *
- * Usage: stask create --spec <spec-path> --name "Task Name" [--type Feature|Task|Bug]
+ * Usage:
+ *   stask create --name "Task Name" [--type Feature|Task|Bug]           → Backlog (no spec)
+ *   stask create --name "Task Name" --spec <spec-path> [--type ...]     → To-Do (with spec)
  */
 
 import path from 'path';
@@ -49,56 +51,69 @@ async function discoverListItemThread(slackApi, listChannelId, itemDateCreated) 
 export async function run(argv) {
   const args = parseArgs(argv);
 
-  if (!args.spec || !args.name) {
-    console.error('Usage: stask create --spec <spec-path> --name "Task Name" [--type Feature|Task|Bug]');
+  if (!args.name) {
+    console.error('Usage: stask create --name "Task Name" [--spec <spec-path>] [--type Feature|Task|Bug]');
     process.exit(1);
   }
 
   const libs = await getWorkspaceLibs();
-  const ws = CONFIG.specsDir;
-  const relPath = args.spec.startsWith('shared/') ? args.spec : path.relative(ws, path.resolve(args.spec));
-  const fullPath = path.resolve(ws, relPath);
+  const hasSpec = !!args.spec;
+  let specValue = null;
+  let fileId = null;
 
-  // Validate spec exists
-  libs.validate.validateSpecExists(relPath);
+  if (hasSpec) {
+    const ws = CONFIG.specsDir;
+    const relPath = args.spec.startsWith('shared/') ? args.spec : path.relative(ws, path.resolve(args.spec));
+    const fullPath = path.resolve(ws, relPath);
 
-  // Ensure spec is uploaded to Slack
-  const registry = libs.fileUploader.loadRegistry(CONFIG.registryPath);
-  let fileId;
-  const content = fs.readFileSync(fullPath, 'utf-8');
-  const hash = createHash('sha256').update(content).digest('hex').slice(0, 16);
-  const existing = registry.files[relPath];
+    // Validate spec exists
+    libs.validate.validateSpecExists(relPath);
 
-  if (existing && existing.hash === hash && existing.fileId) {
-    fileId = existing.fileId;
-  } else {
-    const filename = path.basename(relPath);
-    fileId = await libs.slackApi.uploadFile(filename, content);
-    registry.files[relPath] = {
-      fileId, hash, title: filename,
-      uploadedAt: new Date().toISOString(),
-      sizeBytes: Buffer.byteLength(content, 'utf-8'),
-    };
-    libs.fileUploader.saveRegistry(CONFIG.registryPath, registry);
-    console.error(`Uploaded spec to Slack: ${fileId}`);
+    // Ensure spec is uploaded to Slack
+    const registry = libs.fileUploader.loadRegistry(CONFIG.registryPath);
+    const content = fs.readFileSync(fullPath, 'utf-8');
+    const hash = createHash('sha256').update(content).digest('hex').slice(0, 16);
+    const existing = registry.files[relPath];
+
+    if (existing && existing.hash === hash && existing.fileId) {
+      fileId = existing.fileId;
+    } else {
+      const filename = path.basename(relPath);
+      fileId = await libs.slackApi.uploadFile(filename, content);
+      registry.files[relPath] = {
+        fileId, hash, title: filename,
+        uploadedAt: new Date().toISOString(),
+        sizeBytes: Buffer.byteLength(content, 'utf-8'),
+      };
+      libs.fileUploader.saveRegistry(CONFIG.registryPath, registry);
+      console.error(`Uploaded spec to Slack: ${fileId}`);
+    }
+
+    const specName = relPath.replace(/^shared\//, '');
+    specValue = libs.validate.formatSpecValue(specName, fileId);
   }
+
+  const initialStatus = hasSpec ? 'To-Do' : 'Backlog';
+  const initialAssignee = hasSpec ? CONFIG.human.name : null;
 
   const result = await withTransaction(
     (db, libs) => {
       const taskId = libs.trackerDb.getNextTaskId();
-      const specName = relPath.replace(/^shared\//, '');
-      const specValue = libs.validate.formatSpecValue(specName, fileId);
 
-      libs.trackerDb.insertTask({
+      const taskFields = {
         task_id: taskId,
         task_name: args.name,
-        status: 'To-Do',
-        assigned_to: CONFIG.human.name,
-        spec: specValue,
+        status: initialStatus,
         type: args.type || 'Feature',
-      });
+      };
+      if (initialAssignee) taskFields.assigned_to = initialAssignee;
+      if (specValue) taskFields.spec = specValue;
 
-      libs.trackerDb.addLogEntry(taskId, `${taskId} "${args.name}" created. Spec: ${specValue}. Status: To-Do → ${CONFIG.human.name}.`);
+      libs.trackerDb.insertTask(taskFields);
+
+      const logSpec = specValue ? `Spec: ${specValue}. ` : '';
+      const logAssign = initialAssignee ? ` → ${initialAssignee}` : '';
+      libs.trackerDb.addLogEntry(taskId, `${taskId} "${args.name}" created. ${logSpec}Status: ${initialStatus}${logAssign}.`);
 
       const taskRow = libs.trackerDb.findTask(taskId);
       return { taskId, taskRow, specValue };
@@ -124,7 +139,9 @@ export async function run(argv) {
       const threadTs = await discoverListItemThread(libs.slackApi, listChannelId, dateCreated);
       if (threadTs) {
         const humanMention = `<@${CONFIG.human.slackUserId}>`;
-        const msg = `Creating this thread to discuss *${result.taskId}: ${args.name}*. This will be the thread where we post updates and talk about this task.\n\n${humanMention} spec is ready for your review. Let me know what you think!`;
+        const msg = hasSpec
+          ? `Creating this thread to discuss *${result.taskId}: ${args.name}*. This will be the thread where we post updates and talk about this task.\n\n${humanMention} spec is ready for your review. Let me know what you think!`
+          : `Creating this thread to discuss *${result.taskId}: ${args.name}*. This will be the thread where we post updates and talk about this task.\n\nStatus: *Backlog* — no spec yet. Discuss requirements here before writing the spec.`;
         await libs.slackApi.postMessage(listChannelId, msg, { threadTs });
         setThreadRef(db, result.taskId, listChannelId, threadTs);
       }
@@ -133,5 +150,7 @@ export async function run(argv) {
     console.error(`WARNING: Thread linking failed: ${err.message}`);
   }
 
-  console.log(`Created ${result.taskId}: "${args.name}" | Status: To-Do | Assigned: ${CONFIG.human.name} | Spec: ${fileId}`);
+  const assignLabel = initialAssignee || 'Unassigned';
+  const specLabel = fileId || 'None';
+  console.log(`Created ${result.taskId}: "${args.name}" | Status: ${initialStatus} | Assigned: ${assignLabel} | Spec: ${specLabel}`);
 }

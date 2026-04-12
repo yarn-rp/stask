@@ -16,6 +16,33 @@ let db;
 describe('Valid status transitions', () => {
   beforeEach(() => { db = createTestDb(); });
 
+  // From Backlog
+  it('Backlog → To-Do', () => {
+    createTaskAtStatus(db, 'T-B01', 'Backlog');
+    updateTask(db, 'T-B01', { status: 'To-Do', spec: 'specs/test.md (F0TEST)' });
+    assert.equal(getTask(db, 'T-B01').status, 'To-Do');
+  });
+
+  it('Backlog → Blocked', () => {
+    createTaskAtStatus(db, 'T-B02', 'Backlog');
+    updateTask(db, 'T-B02', { status: 'Blocked' });
+    assert.equal(getTask(db, 'T-B02').status, 'Blocked');
+  });
+
+  it('Blocked → Backlog', () => {
+    createTaskAtStatus(db, 'T-B03', 'Blocked');
+    updateTask(db, 'T-B03', { status: 'Backlog' });
+    assert.equal(getTask(db, 'T-B03').status, 'Backlog');
+  });
+
+  it('Backlog task can be created without a spec', () => {
+    db.prepare('INSERT INTO tasks (task_id, task_name, status, type) VALUES (?, ?, ?, ?)')
+      .run('T-B04', 'No spec task', 'Backlog', 'Feature');
+    const task = getTask(db, 'T-B04');
+    assert.equal(task.status, 'Backlog');
+    assert.equal(task.spec, null);
+  });
+
   // From To-Do
   it('To-Do → In-Progress (subtask, no worktree needed)', () => {
     // Subtasks don't need worktree
@@ -129,6 +156,22 @@ describe('Valid status transitions', () => {
 
 describe('Invalid status transitions (must fail)', () => {
   beforeEach(() => { db = createTestDb(); });
+
+  // From Backlog: can only go to To-Do or Blocked
+  it('Backlog → In-Progress (skip)', () => {
+    createTaskAtStatus(db, 'T-B10', 'Backlog');
+    assert.throws(() => updateTask(db, 'T-B10', { status: 'In-Progress' }), /Backlog can only transition/);
+  });
+
+  it('Backlog → Done (skip)', () => {
+    createTaskAtStatus(db, 'T-B11', 'Backlog');
+    assert.throws(() => updateTask(db, 'T-B11', { status: 'Done' }), /Backlog can only transition/);
+  });
+
+  it('Backlog → Testing (skip)', () => {
+    createTaskAtStatus(db, 'T-B12', 'Backlog');
+    assert.throws(() => updateTask(db, 'T-B12', { status: 'Testing' }), /Backlog can only transition/);
+  });
 
   // From To-Do: can only go to In-Progress or Blocked
   // Use a subtask (needs real parent) to avoid worktree requirement
@@ -282,11 +325,12 @@ describe('Prerequisite enforcement (triggers)', () => {
       BEFORE UPDATE OF status ON tasks WHEN OLD.status != NEW.status
       BEGIN SELECT CASE
         WHEN OLD.status = 'Done' THEN RAISE(ABORT, 'Cannot transition from Done (terminal state)')
+        WHEN OLD.status = 'Backlog' AND NEW.status NOT IN ('To-Do','Blocked') THEN RAISE(ABORT, 'Backlog can only transition to To-Do or Blocked')
         WHEN OLD.status = 'To-Do' AND NEW.status NOT IN ('In-Progress','Blocked') THEN RAISE(ABORT, 'To-Do can only transition to In-Progress or Blocked')
         WHEN OLD.status = 'In-Progress' AND NEW.status NOT IN ('Testing','Blocked') THEN RAISE(ABORT, 'In-Progress can only transition to Testing or Blocked')
         WHEN OLD.status = 'Testing' AND NEW.status NOT IN ('Ready for Human Review','In-Progress','Blocked') THEN RAISE(ABORT, 'Testing can only transition to Ready for Human Review, In-Progress, or Blocked')
         WHEN OLD.status = 'Ready for Human Review' AND NEW.status NOT IN ('Done','In-Progress','Blocked') THEN RAISE(ABORT, 'Ready for Human Review can only transition to Done, In-Progress, or Blocked')
-        WHEN OLD.status = 'Blocked' AND NEW.status NOT IN ('To-Do','In-Progress','Testing','Ready for Human Review') THEN RAISE(ABORT, 'Blocked can transition to To-Do, In-Progress, Testing, or Ready for Human Review')
+        WHEN OLD.status = 'Blocked' AND NEW.status NOT IN ('Backlog','To-Do','In-Progress','Testing','Ready for Human Review') THEN RAISE(ABORT, 'Blocked can transition to Backlog, To-Do, In-Progress, Testing, or Ready for Human Review')
       END; END;
     `);
     db.exec(`

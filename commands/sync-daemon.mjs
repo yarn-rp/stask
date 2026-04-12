@@ -9,8 +9,9 @@
 
 import fs from 'fs';
 import path from 'path';
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import { CONFIG } from '../lib/env.mjs';
+import { loadProjectsRegistry } from '../lib/resolve-home.mjs';
 
 const STASK_HOME = CONFIG.staskHome;
 const PID_FILE = path.resolve(STASK_HOME, 'sync-daemon.pid');
@@ -20,11 +21,12 @@ const LOG_FILE = path.resolve(STASK_HOME, 'logs', 'sync-daemon.log');
 export async function run(argv) {
   const subCmd = argv[0];
   switch (subCmd) {
-    case 'start':  return start();
-    case 'stop':   return stop();
-    case 'status': return status();
+    case 'start':    return start();
+    case 'stop':     return stop();
+    case 'stop-all': return stopAll();
+    case 'status':   return status();
     default:
-      console.error('Usage: stask sync-daemon <start|stop|status>');
+      console.error('Usage: stask sync-daemon <start|stop|stop-all|status>');
       process.exit(1);
   }
 }
@@ -71,7 +73,7 @@ export function startDaemon() {
   const child = spawn(process.execPath, [DAEMON_SCRIPT], {
     detached: true,
     stdio: ['ignore', logFd, logFd],
-    env: { ...process.env },
+    env: { ...process.env, STASK_HOME },
   });
   child.unref();
 
@@ -131,4 +133,42 @@ function status() {
       try { fs.unlinkSync(PID_FILE); } catch (_) {}
     }
   }
+}
+
+function stopAll() {
+  const registry = loadProjectsRegistry();
+  const projects = Object.entries(registry.projects || {});
+  let killed = 0;
+
+  // Kill daemons tracked by PID files in each project
+  for (const [name, info] of projects) {
+    const pidPath = path.join(info.repoPath, '.stask', 'sync-daemon.pid');
+    try {
+      const pid = parseInt(fs.readFileSync(pidPath, 'utf-8').trim(), 10);
+      if (isAlive(pid)) {
+        process.kill(pid, 'SIGTERM');
+        console.log(`Stopped daemon for project "${name}" (PID ${pid})`);
+        killed++;
+      }
+      fs.unlinkSync(pidPath);
+    } catch (_) {}
+  }
+
+  // Fallback: kill any orphans not tracked by PID files
+  try {
+    const pids = execSync('pgrep -f sync-daemon.mjs', { encoding: 'utf-8' })
+      .trim().split('\n').filter(Boolean).map(Number);
+    for (const pid of pids) {
+      if (pid === process.pid) continue;
+      try {
+        process.kill(pid, 'SIGTERM');
+        console.log(`Stopped orphan daemon (PID ${pid})`);
+        killed++;
+      } catch (_) {}
+    }
+  } catch (_) {
+    // pgrep returns non-zero if no matches
+  }
+
+  console.log(killed > 0 ? `Stopped ${killed} daemon(s) total` : 'No daemons were running');
 }

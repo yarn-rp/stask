@@ -92,8 +92,14 @@ function ensureSyncDaemon() {
   }
 }
 
-// Don't auto-start for sync-daemon commands (avoid recursion) or read-only queries
-if (_cmd && _cmd !== 'sync-daemon' && _cmd !== '--help' && _cmd !== '-h') {
+// Don't auto-start for sync-daemon commands (avoid recursion), read-only queries,
+// or subprocess invocations (heartbeat-all spawns child stask processes)
+const READ_ONLY = new Set([
+  'heartbeat', 'heartbeat-all', 'list', 'show', 'log',
+  'session', 'pr-status', 'projects',
+]);
+if (_cmd && _cmd !== 'sync-daemon' && _cmd !== '--help' && _cmd !== '-h'
+    && !READ_ONLY.has(_cmd) && !process.env.STASK_NO_DAEMON) {
   ensureSyncDaemon();
 }
 

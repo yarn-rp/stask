@@ -51,7 +51,7 @@ export async function run(args) {
       const result = execFileSync(
         process.execPath,
         [STASK_BIN, 'heartbeat', agentName, '--project', projectName],
-        { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
+        { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, STASK_NO_DAEMON: '1' } }
       );
 
       const heartbeat = JSON.parse(result);

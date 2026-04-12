@@ -6,7 +6,6 @@
  *
  * Commands:
  *   create          Create a new task (uploads spec to Slack)
- *   approve         Approve a task spec (reassign to Lead)
  *   transition      Transition task status
  *   subtask create  Create a subtask under a parent
  *   subtask done    Mark a subtask as Done
@@ -23,33 +22,6 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { execFileSync } from 'child_process';
-
-// ─── Auto-rebuild better-sqlite3 if compiled for wrong Node version ─
-{
-  try {
-    const mod = await import('better-sqlite3');
-    // Trigger actual load by constructing a DB (import alone may not load the native binding)
-    new mod.default(':memory:').close();
-  } catch (err) {
-    if (err.code === 'ERR_DLOPEN_FAILED') {
-      const __dir = path.dirname(fileURLToPath(import.meta.url));
-      console.error('Native module mismatch — rebuilding better-sqlite3...');
-      execFileSync('npm', ['rebuild', 'better-sqlite3'], {
-        cwd: path.resolve(__dir, '..'),
-        stdio: ['pipe', 'inherit', 'inherit'],
-      });
-      // Re-exec ourselves — can't reload native modules in same process
-      const result = execFileSync(process.execPath, process.argv.slice(1), {
-        stdio: 'inherit',
-        env: process.env,
-      });
-      process.exit(0);
-    }
-    throw err;
-  }
-}
-
 // ─── Extract --project flag before module loading ─────────────────
 // Must happen before env.mjs is imported since it resolves project root at import time.
 {
@@ -107,7 +79,6 @@ if (_cmd && _cmd !== 'sync-daemon' && _cmd !== '--help' && _cmd !== '-h'
 
 const COMMANDS = {
   'create':         () => import('../commands/create.mjs'),
-  'approve':        () => import('../commands/approve.mjs'),
   'transition':     () => import('../commands/transition.mjs'),
   'subtask':        null, // nested — handled below
   'qa':             () => import('../commands/qa.mjs'),
@@ -185,7 +156,6 @@ Usage: stask <command> [args...]
 
 Mutation commands (DB + Slack transaction):
   create --spec <path> --name "..." [--type Feature|Bug|Task]
-  approve <task-id>
   transition <task-id> <status>
   subtask create --parent <id> --name "..." --assign <agent>
   subtask done <subtask-id>

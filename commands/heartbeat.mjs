@@ -190,6 +190,7 @@ export async function run(argv) {
     }
 
     const pendingTasks = [];
+    const workerSubtaskQueue = [];
 
     for (const task of tasksToCheck) {
       const taskId = task['Task ID'];
@@ -331,12 +332,9 @@ These are NOT from ${CONFIG.human.name}. Send a Slack DM to ${CONFIG.human.name}
         }
       }
 
-      // ─── Worker actions ────────────────────────────────────────
+      // ─── Worker actions (collected, grouped by parent after loop) ─
       if (agentRole === 'worker' && status === 'In-Progress' && isSubtask) {
-        action = 'build';
-        const wt = libs.trackerDb.getParentWorktree(taskId);
-        const wtInstruction = wt ? `\nIMPORTANT: Work in the task worktree at: ${wt.path} (branch: ${wt.branch}). cd to that directory before making any changes.` : '';
-        prompt = `Build subtask ${taskId}: "${task['Task Name']}". Spec file ID: ${specFileId}. Read the spec from shared/specs/ for full details.${wtInstruction}\nWhen complete, run: stask subtask done ${taskId}`;
+        workerSubtaskQueue.push({ task, specFileId });
       }
 
       // ─── QA actions ────────────────────────────────────────────
@@ -351,6 +349,86 @@ These are NOT from ${CONFIG.human.name}. Send a Slack DM to ${CONFIG.human.name}
         const threadRef = getThreadRef(db, isSubtask ? task['Parent'] : taskId);
         const thread = threadRef ? { channelId: threadRef.channelId, threadTs: threadRef.threadTs } : null;
         pendingTasks.push({ taskId, taskName: task['Task Name'], status, parent: task['Parent'], specFileId, action, prompt, thread });
+      }
+    }
+
+    // ─── Group worker subtasks by parent into batch entries ────
+    if (workerSubtaskQueue.length > 0) {
+      const grouped = new Map();
+      for (const { task, specFileId } of workerSubtaskQueue) {
+        const parentId = task['Parent'];
+        if (!grouped.has(parentId)) grouped.set(parentId, []);
+        grouped.get(parentId).push({ task, specFileId });
+      }
+
+      for (const [parentId, subtasks] of grouped) {
+        const wt = libs.trackerDb.getParentWorktree(parentId);
+        const wtInstruction = wt
+          ? `\nWORKTREE: ${wt.path} (branch: ${wt.branch}). cd there before making any changes.`
+          : '';
+
+        const subtaskList = subtasks.map((s, i) =>
+          `${i + 1}. ${s.task['Task ID']}: "${s.task['Task Name']}"`
+        ).join('\n');
+
+        const doneCommands = subtasks.map(s =>
+          `npx @web42/stask subtask done ${s.task['Task ID']}`
+        ).join('\n');
+
+        const prompt = `You have ${subtasks.length} subtask(s) to implement IN ORDER. Complete each one fully before moving to the next.
+${wtInstruction}
+
+SUBTASKS:
+${subtaskList}
+
+Spec file ID: ${subtasks[0].specFileId}. Read the spec for full details on each subtask.
+
+WORKFLOW — for each subtask:
+1. Read the relevant spec section for that subtask
+2. Implement the changes
+3. git add + git commit with a clear message referencing the subtask ID
+4. git push
+5. Run: npx @web42/stask subtask done <subtask-id>
+6. Post progress to the task thread
+7. Run /compact to free up context before starting the next subtask
+
+DONE COMMANDS (run after completing each):
+${doneCommands}
+
+IMPORTANT: Complete subtasks sequentially. Commit, push, and mark done after EACH one. Use /compact between subtasks to manage context.`;
+
+        const threadRef = getThreadRef(db, parentId);
+        const thread = threadRef ? { channelId: threadRef.channelId, threadTs: threadRef.threadTs } : null;
+
+        if (subtasks.length === 1) {
+          // Single subtask — use original format for backward compatibility
+          const s = subtasks[0];
+          const singleWt = wt
+            ? `\nIMPORTANT: Work in the task worktree at: ${wt.path} (branch: ${wt.branch}). cd to that directory before making any changes.`
+            : '';
+          pendingTasks.push({
+            taskId: s.task['Task ID'],
+            taskName: s.task['Task Name'],
+            status: s.task['Status'],
+            parent: parentId,
+            specFileId: s.specFileId,
+            action: 'build',
+            prompt: `Build subtask ${s.task['Task ID']}: "${s.task['Task Name']}". Spec file ID: ${s.specFileId}. Read the spec from shared/specs/ for full details.${singleWt}\nWhen complete, run: npx @web42/stask subtask done ${s.task['Task ID']}`,
+            thread,
+          });
+        } else {
+          pendingTasks.push({
+            taskId: parentId,
+            taskName: `[${subtasks.length} subtasks] ${subtasks.map(s => s.task['Task ID']).join(', ')}`,
+            status: 'In-Progress',
+            parent: 'None',
+            specFileId: subtasks[0].specFileId,
+            action: 'build-batch',
+            prompt,
+            thread,
+            subtaskIds: subtasks.map(s => s.task['Task ID']),
+          });
+        }
       }
     }
 

@@ -38,12 +38,13 @@ You follow a strict 6-phase process. Never skip a phase.
 
 ### Phase 4: Approval & Delegation
 - Create task via `npx @web42/stask create` (uploads spec to Slack, creates in tracker.db)
-- Wait for Yan to check `spec_approved` or run `npx @web42/stask approve`
-- Create subtasks using the breakdowns from Phase 2
+- Wait for Yan to check `spec_approved` in the Slack list (this is the ONLY approval mechanism — there is no CLI approve command)
+- Create EXACTLY the subtasks defined in the spec's Subtasks section — no more, no fewer, no renames
+- If you need additional subtasks beyond the spec, STOP and ask Yan for a spec amendment first
 - Transition to In-Progress (auto-creates worktree + branch)
 
-### Phase 5: Implementation (Spawn Workers)
-- Spawn workers with Implementation Prompts referencing their spec section
+### Phase 5: Implementation (Workers)
+- Workers receive all their subtasks in a single session via heartbeat — they implement sequentially in the shared worktree
 - Monitor via `npx @web42/stask heartbeat richard`
 - When all subtasks Done → auto-transitions to Testing
 
@@ -76,8 +77,9 @@ You follow a strict 6-phase process. Never skip a phase.
 
 ### Spec Approved (To-Do, assigned to you)
 1. Read the spec (use the Slack file ID from `npx @web42/stask show`)
-2. Create subtasks: `npx @web42/stask subtask create --parent T-XXX --name "..." --assign <worker>`
-3. Transition: `npx @web42/stask transition T-XXX In-Progress`
+2. Cross-reference the spec's `## Subtasks` section — create EXACTLY those subtasks, no extras
+3. Create subtasks: `npx @web42/stask subtask create --parent T-XXX --name "..." --assign <worker>`
+4. Transition: `npx @web42/stask transition T-XXX In-Progress`
 
 ### QA Passed (Testing, reassigned to you)
 1. Read the spec, QA report, git log, and diff

@@ -39,7 +39,9 @@ export async function createListRow(listId, initialFields, parentItemId = null) 
   record('createListRow', { listId, initialFields, parentItemId });
   maybeThrow();
   const rowId = `R_MOCK_${_nextRowId++}`;
-  return { ok: true, item: { id: rowId, fields: initialFields } };
+  const item = { id: rowId, fields: initialFields };
+  if (parentItemId) item.parent_item_id = parentItemId;
+  return { ok: true, item };
 }
 
 export async function updateListCells(listId, cells) {

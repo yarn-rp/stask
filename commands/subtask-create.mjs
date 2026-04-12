@@ -51,9 +51,13 @@ export async function run(argv) {
       const taskRow = libs.trackerDb.findTask(subtaskId);
       return { subtaskId, taskRow, parentSpec };
     },
-    async ({ taskRow }, db) => {
-      const { slackOps } = await syncSubtaskToSlack(db, taskRow);
-      return slackOps;
+    async ({ taskRow, subtaskId }, db) => {
+      try {
+        const { slackOps } = await syncSubtaskToSlack(db, taskRow);
+        return slackOps;
+      } catch (err) {
+        throw new Error(`Slack sync failed for subtask ${subtaskId} (parent: ${args.parent}, name: "${args.name}"): ${err.message}`);
+      }
     }
   );
 

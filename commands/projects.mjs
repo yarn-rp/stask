@@ -10,7 +10,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import Database from 'better-sqlite3';
+import { DatabaseSync } from 'node:sqlite';
 import { loadProjectsRegistry, registryPath } from '../lib/resolve-home.mjs';
 
 export async function run(args) {
@@ -62,7 +62,7 @@ function listProjects(args) {
       const dbPath = path.join(staskDir, 'tracker.db');
       if (fs.existsSync(dbPath)) {
         try {
-          const db = new Database(dbPath, { readonly: true });
+          const db = new DatabaseSync(dbPath, { readOnly: true });
           const total = db.prepare('SELECT COUNT(*) as c FROM tasks WHERE parent_id IS NULL').get().c;
           const active = db.prepare("SELECT COUNT(*) as c FROM tasks WHERE parent_id IS NULL AND status != 'Done'").get().c;
           db.close();
@@ -131,7 +131,7 @@ function showProject(name) {
     const dbPath = path.join(staskDir, 'tracker.db');
     if (fs.existsSync(dbPath)) {
       try {
-        const db = new Database(dbPath, { readonly: true });
+        const db = new DatabaseSync(dbPath, { readOnly: true });
         const total = db.prepare('SELECT COUNT(*) as c FROM tasks WHERE parent_id IS NULL').get().c;
         const active = db.prepare("SELECT COUNT(*) as c FROM tasks WHERE parent_id IS NULL AND status != 'Done'").get().c;
         db.close();

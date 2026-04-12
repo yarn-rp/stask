@@ -3,7 +3,7 @@
  * tracker.db schema + triggers. No mocking — real schema, real constraints.
  */
 
-import Database from 'better-sqlite3';
+import { DatabaseSync } from 'node:sqlite';
 
 const SCHEMA = `
 PRAGMA journal_mode = WAL;
@@ -125,8 +125,8 @@ END;
  * Create a fresh in-memory database with full schema + triggers.
  */
 export function createTestDb() {
-  const db = new Database(':memory:');
-  db.pragma('foreign_keys = ON');
+  const db = new DatabaseSync(':memory:');
+  db.exec('PRAGMA foreign_keys = ON');
   db.exec(SCHEMA);
   db.exec(TRIGGERS);
   return db;

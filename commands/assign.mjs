@@ -11,6 +11,7 @@
 import { CONFIG, getWorkspaceLibs } from '../lib/env.mjs';
 import { getSlackUserId } from '../lib/roles.mjs';
 import { syncTaskToSlack, getSlackRowId } from '../lib/slack-row.mjs';
+import { postThreadUpdate } from '../lib/thread-notify.mjs';
 
 export async function run(argv) {
   const taskId = argv[0];
@@ -61,4 +62,6 @@ export async function run(argv) {
   await syncTaskToSlack(db, updatedTask, parentRowId);
 
   console.log(`${taskId}: ${oldAssignee} → ${displayName} (synced to Slack)`);
+
+  await postThreadUpdate(taskId, `*${taskId}* reassigned: *${oldAssignee}* → *${displayName}*`, db);
 }

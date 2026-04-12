@@ -7,6 +7,7 @@
 import { getWorkspaceLibs } from '../lib/env.mjs';
 import { withTransaction } from '../lib/tx.mjs';
 import { syncSubtaskToSlack } from '../lib/slack-row.mjs';
+import { postThreadUpdate } from '../lib/thread-notify.mjs';
 
 function parseArgs(argv) {
   const args = {};
@@ -63,4 +64,6 @@ export async function run(argv) {
 
   const specFileId = result.parentSpec.match(/\((\w+)\)$/)?.[1] || result.parentSpec;
   console.log(`Created ${result.subtaskId}: "${args.name}" | Parent: ${args.parent} | Assigned: ${args.assign} | Spec: ${specFileId}`);
+
+  await postThreadUpdate(args.parent, `Subtask created: *${result.subtaskId}* "${args.name}" | Assigned to *${args.assign}*`);
 }

@@ -30,5 +30,8 @@
   "license": "MIT",
   "engines": {
     "node": ">=22.5.0"
+  },
+  "dependencies": {
+    "turndown": "^7.2.4"
   }
 }

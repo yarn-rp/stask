@@ -19,6 +19,7 @@ function parseArgs(argv) {
     if (argv[i] === '--spec' && argv[i + 1]) args.spec = argv[++i];
     else if (argv[i] === '--name' && argv[i + 1]) args.name = argv[++i];
     else if (argv[i] === '--type' && argv[i + 1]) args.type = argv[++i];
+    else if (argv[i] === '--use-canvas') args.useCanvas = true;
   }
   return args;
 }
@@ -58,8 +59,10 @@ export async function run(argv) {
 
   const libs = await getWorkspaceLibs();
   const hasSpec = !!args.spec;
+  const useCanvas = !!args.useCanvas;
   let specValue = null;
   let fileId = null;
+  let canvasId = null;
 
   if (hasSpec) {
     const ws = CONFIG.specsDir;
@@ -69,28 +72,44 @@ export async function run(argv) {
     // Validate spec exists
     libs.validate.validateSpecExists(relPath);
 
-    // Ensure spec is uploaded to Slack
-    const registry = libs.fileUploader.loadRegistry(CONFIG.registryPath);
-    const content = fs.readFileSync(fullPath, 'utf-8');
-    const hash = createHash('sha256').update(content).digest('hex').slice(0, 16);
-    const existing = registry.files[relPath];
-
-    if (existing && existing.hash === hash && existing.fileId) {
-      fileId = existing.fileId;
-    } else {
-      const filename = path.basename(relPath);
-      fileId = await libs.slackApi.uploadFile(filename, content);
-      registry.files[relPath] = {
-        fileId, hash, title: filename,
-        uploadedAt: new Date().toISOString(),
-        sizeBytes: Buffer.byteLength(content, 'utf-8'),
-      };
-      libs.fileUploader.saveRegistry(CONFIG.registryPath, registry);
-      console.error(`Uploaded spec to Slack: ${fileId}`);
-    }
-
     const specName = relPath.replace(/^shared\//, '');
-    specValue = libs.validate.formatSpecValue(specName, fileId);
+    const content = fs.readFileSync(fullPath, 'utf-8');
+
+    if (useCanvas) {
+      // Upload spec as a Canvas instead of a File
+      const { extractFrontmatter } = await import('../lib/yaml-frontmatter.mjs');
+      const { markdownToCanvas } = await import('../lib/canvas-format.mjs');
+      const { body } = extractFrontmatter(content);
+      const docContent = markdownToCanvas(body);
+      const canvasResult = await libs.slackApi.createCanvas({
+        title: specName,
+        document_content: docContent,
+      });
+      canvasId = canvasResult.canvas_id;
+      specValue = libs.validate.formatSpecValue(specName, canvasId, 'canvas');
+      console.error(`Created spec Canvas: ${canvasId}`);
+    } else {
+      // Upload spec as a Slack File (original behavior)
+      const registry = libs.fileUploader.loadRegistry(CONFIG.registryPath);
+      const hash = createHash('sha256').update(content).digest('hex').slice(0, 16);
+      const existing = registry.files[relPath];
+
+      if (existing && existing.hash === hash && existing.fileId) {
+        fileId = existing.fileId;
+      } else {
+        const filename = path.basename(relPath);
+        fileId = await libs.slackApi.uploadFile(filename, content);
+        registry.files[relPath] = {
+          fileId, hash, title: filename,
+          uploadedAt: new Date().toISOString(),
+          sizeBytes: Buffer.byteLength(content, 'utf-8'),
+        };
+        libs.fileUploader.saveRegistry(CONFIG.registryPath, registry);
+        console.error(`Uploaded spec to Slack: ${fileId}`);
+      }
+
+      specValue = libs.validate.formatSpecValue(specName, fileId, 'file');
+    }
   }
 
   const initialStatus = hasSpec ? 'To-Do' : 'Backlog';
@@ -151,6 +170,7 @@ export async function run(argv) {
   }
 
   const assignLabel = initialAssignee || 'Unassigned';
-  const specLabel = fileId || 'None';
-  console.log(`Created ${result.taskId}: "${args.name}" | Status: ${initialStatus} | Assigned: ${assignLabel} | Spec: ${specLabel}`);
+  const specLabel = canvasId || fileId || 'None';
+  const specType = useCanvas ? 'Canvas' : 'File';
+  console.log(`Created ${result.taskId}: "${args.name}" | Status: ${initialStatus} | Assigned: ${assignLabel} | Spec (${specType}): ${specLabel}`);
 }

@@ -21,12 +21,13 @@ CREATE TABLE IF NOT EXISTS tasks (
   qa_report_2   TEXT,
   qa_report_3   TEXT,
   type          TEXT NOT NULL DEFAULT 'Task'
-                CHECK (type IN ('Feature','Bug','Task')),
+                CHECK (type IN ('Feature','Bug','Task','Improvement','Research')),
   parent_id     TEXT REFERENCES tasks(task_id),
   blocker       TEXT,
   worktree      TEXT,
   pr            TEXT,
   qa_fail_count INTEGER NOT NULL DEFAULT 0,
+  pr_status     TEXT,
   created_at    TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );

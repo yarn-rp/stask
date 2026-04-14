@@ -8,6 +8,7 @@
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTestDb, insertTask, getTask, updateTask, createTaskAtStatus } from './helpers/test-db.mjs';
+import { runGuards } from '../lib/guards.mjs';
 
 let db;
 
@@ -242,5 +243,136 @@ describe('Full lifecycle walkthrough (single task)', () => {
     assert.equal(task.qa_report_1, '(F0QA1)');
     assert.equal(task.qa_report_2, '(F0QA2)');
     assert.equal(task.qa_report_3, '(F0QA3)');
+  });
+});
+
+// ─── Guard tests (application-layer enforcement) ──────────────────
+
+/**
+ * Helper: build a task object in the shape guards expect.
+ * Guards read task['Task ID'], task['Status'], task['Assigned To'], task['Parent'], etc.
+ */
+function makeTask(overrides = {}) {
+  return {
+    'Task ID': 'T-500',
+    'Task Name': 'Test Task',
+    'Status': 'To-Do',
+    'Assigned To': 'Richard',
+    'Spec': 'specs/test.md (F0TEST)',
+    'Parent': 'None',
+    'Worktree': 'None',
+    'PR': 'None',
+    ...overrides,
+  };
+}
+
+/**
+ * Helper: build a mock libs object with trackerDb.getSubtasks.
+ */
+function makeMockLibs(subtasks = []) {
+  return {
+    trackerDb: {
+      getSubtasks: () => subtasks,
+      findTask: (id) => null,
+    },
+  };
+}
+
+describe('Guard: require_subtasks', () => {
+  it('fails when parent has zero subtasks', () => {
+    const task = makeTask();
+    const libs = makeMockLibs([]);
+    const result = runGuards(task, 'In-Progress', libs);
+    assert.equal(result.ok, false);
+    assert.ok(result.failures.some(f => f.name === 'require_subtasks'));
+    assert.ok(result.failures.some(f => f.reason.includes('subtask')));
+  });
+
+  it('fails when subtasks exist but some are unassigned', () => {
+    const task = makeTask();
+    const subtasks = [
+      { 'Task ID': 'T-500.1', 'Status': 'To-Do', 'Assigned To': 'Gilfoyle' },
+      { 'Task ID': 'T-500.2', 'Status': 'To-Do', 'Assigned To': null },
+    ];
+    const libs = makeMockLibs(subtasks);
+    const result = runGuards(task, 'In-Progress', libs);
+    assert.equal(result.ok, false);
+    assert.ok(result.failures.some(f => f.name === 'require_subtasks'));
+    assert.ok(result.failures.some(f => f.reason.includes('T-500.2')));
+  });
+
+  it('fails when subtask assigned_to is "None"', () => {
+    const task = makeTask();
+    const subtasks = [
+      { 'Task ID': 'T-500.1', 'Status': 'To-Do', 'Assigned To': 'None' },
+    ];
+    const libs = makeMockLibs(subtasks);
+    const result = runGuards(task, 'In-Progress', libs);
+    assert.equal(result.ok, false);
+    assert.ok(result.failures.some(f => f.name === 'require_subtasks'));
+  });
+
+  it('passes when all subtasks are assigned', () => {
+    const task = makeTask();
+    const subtasks = [
+      { 'Task ID': 'T-500.1', 'Status': 'To-Do', 'Assigned To': 'Gilfoyle' },
+      { 'Task ID': 'T-500.2', 'Status': 'To-Do', 'Assigned To': 'Dinesh' },
+    ];
+    const libs = makeMockLibs(subtasks);
+    // Note: require_approved will also run — task is assigned to Richard (not human), so it passes
+    const result = runGuards(task, 'In-Progress', libs);
+    // Checks pass, but setup_worktree will fail (no real worktree). Check only check guards.
+    // require_subtasks and require_approved should both pass
+    const checkFailures = result.failures.filter(f => f.name === 'require_subtasks' || f.name === 'require_approved');
+    assert.equal(checkFailures.length, 0);
+  });
+
+  it('skipped for subtasks (non-parent tasks)', () => {
+    const task = makeTask({ 'Parent': 'T-400' });
+    const libs = makeMockLibs([]);
+    const result = runGuards(task, 'In-Progress', libs);
+    // Guards are skipped entirely for non-parent tasks
+    assert.equal(result.ok, true);
+  });
+});
+
+describe('Guard: block_cli_done', () => {
+  it('blocks parent task from transitioning to Done via CLI', () => {
+    const task = makeTask({ 'Status': 'Ready for Human Review' });
+    const libs = makeMockLibs([]);
+    const result = runGuards(task, 'Done', libs);
+    assert.equal(result.ok, false);
+    assert.ok(result.failures.some(f => f.name === 'block_cli_done'));
+    assert.ok(result.failures.some(f => f.reason.includes('CLI')));
+  });
+
+  it('does not affect subtasks (non-parent tasks)', () => {
+    const task = makeTask({ 'Parent': 'T-400', 'Status': 'Ready for Human Review' });
+    const libs = makeMockLibs([]);
+    const result = runGuards(task, 'Done', libs);
+    assert.equal(result.ok, true);
+  });
+});
+
+describe('Guard: all_subtasks_done (tightened)', () => {
+  it('fails when parent has zero subtasks', () => {
+    const task = makeTask({ 'Status': 'In-Progress' });
+    const libs = makeMockLibs([]);
+    const result = runGuards(task, 'Testing', libs);
+    assert.equal(result.ok, false);
+    assert.ok(result.failures.some(f => f.name === 'all_subtasks_done'));
+    assert.ok(result.failures.some(f => f.reason.includes('no subtask')));
+  });
+
+  it('fails when some subtasks are not Done', () => {
+    const task = makeTask({ 'Status': 'In-Progress', 'Worktree': 'feature/test (~/wt/test)' });
+    const subtasks = [
+      { 'Task ID': 'T-500.1', 'Status': 'Done', 'Assigned To': 'Gilfoyle' },
+      { 'Task ID': 'T-500.2', 'Status': 'In-Progress', 'Assigned To': 'Dinesh' },
+    ];
+    const libs = makeMockLibs(subtasks);
+    const result = runGuards(task, 'Testing', libs);
+    assert.equal(result.ok, false);
+    assert.ok(result.failures.some(f => f.name === 'all_subtasks_done'));
   });
 });

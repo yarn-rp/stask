@@ -1,0 +1,23 @@
+{
+  "name": "Full-Stack Engineering Team",
+  "version": "1.0.0",
+  "description": "Lead + Backend + Frontend + QA with OpenClaw orchestration",
+
+  "skills": {
+    "universal": ["find-skills", "actual-self-improvement", "vassili-clawhub-cli"]
+  },
+
+  "openclaw": {
+    "heartbeat": { "every": "10m" },
+    "compaction": { "mode": "safeguard" },
+    "maxConcurrent": 4,
+    "subagents": { "maxConcurrent": 8 },
+    "memorySearch": { "provider": "ollama" }
+  },
+
+  "stask": {
+    "staleSessionMinutes": 30,
+    "syncIntervalSeconds": 60,
+    "maxQaRetries": 3
+  }
+}

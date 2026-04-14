@@ -1,0 +1,83 @@
+{
+  "providers": {
+    "ollama": {
+      "baseUrl": "http://127.0.0.1:11434",
+      "apiKey": "OLLAMA_API_KEY",
+      "api": "ollama",
+      "models": [
+        {
+          "id": "qwen3.5:cloud",
+          "name": "Qwen 3.5 (SOTA all-around)",
+          "reasoning": false,
+          "input": ["text"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 262144,
+          "maxTokens": 8192
+        },
+        {
+          "id": "glm-5.1:cloud",
+          "name": "GLM 5.1 (agentic engineering)",
+          "reasoning": false,
+          "input": ["text"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 198000,
+          "maxTokens": 8192
+        },
+        {
+          "id": "gemma4:31b-cloud",
+          "name": "Gemma 4 31B (reasoning + tool calling)",
+          "reasoning": false,
+          "input": ["text"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 262144,
+          "maxTokens": 8192
+        },
+        {
+          "id": "qwen3-coder-next:cloud",
+          "name": "Qwen 3 Coder Next (coding agent)",
+          "reasoning": false,
+          "input": ["text"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 262144,
+          "maxTokens": 8192
+        },
+        {
+          "id": "minimax-m2.7:cloud",
+          "name": "MiniMax M2.7 (coding + agentic)",
+          "reasoning": false,
+          "input": ["text"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 200000,
+          "maxTokens": 8192
+        },
+        {
+          "id": "qwen3-coder:480b-cloud",
+          "name": "Qwen 3 Coder 480B (coding specialist)",
+          "reasoning": false,
+          "input": ["text"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 262144,
+          "maxTokens": 8192
+        },
+        {
+          "id": "minimax-m2.5:cloud",
+          "name": "MiniMax M2.5 (fast coding)",
+          "reasoning": false,
+          "input": ["text"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 128000,
+          "maxTokens": 8192
+        },
+        {
+          "id": "nomic-embed-text:latest",
+          "name": "Nomic Embed (embeddings)",
+          "reasoning": false,
+          "input": ["text"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 2048,
+          "maxTokens": 8192
+        }
+      ]
+    }
+  }
+}

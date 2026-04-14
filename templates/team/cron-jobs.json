@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "jobs": {
+    "{{LEAD_NAME_LOWER}}-heartbeat": {
+      "agentId": "{{LEAD_NAME_LOWER}}",
+      "schedule": { "cron": "0,20,40 * * * *" },
+      "enabled": true,
+      "timeout": 600,
+      "prompt": "Run your heartbeat. Check stask pipeline and spawn subsessions for pending work."
+    },
+    "{{BACKEND_NAME_LOWER}}-heartbeat": {
+      "agentId": "{{BACKEND_NAME_LOWER}}",
+      "schedule": { "cron": "5,25,45 * * * *" },
+      "enabled": true,
+      "timeout": 600,
+      "prompt": "Run your heartbeat. Check stask pipeline and spawn subsessions for pending work."
+    },
+    "{{FRONTEND_NAME_LOWER}}-heartbeat": {
+      "agentId": "{{FRONTEND_NAME_LOWER}}",
+      "schedule": { "cron": "10,30,50 * * * *" },
+      "enabled": true,
+      "timeout": 600,
+      "prompt": "Run your heartbeat. Check stask pipeline and spawn subsessions for pending work."
+    },
+    "{{QA_NAME_LOWER}}-heartbeat": {
+      "agentId": "{{QA_NAME_LOWER}}",
+      "schedule": { "cron": "15,35,55 * * * *" },
+      "enabled": true,
+      "timeout": 600,
+      "prompt": "Run your heartbeat. Check stask pipeline and spawn subsessions for pending work."
+    }
+  }
+}

@@ -1,0 +1,125 @@
+{
+  "lead": {
+    "model": {
+      "primary": "ollama/qwen3.5:cloud",
+      "fallbacks": ["ollama/glm-5.1:cloud", "ollama/gemma4:31b-cloud"]
+    },
+    "skills": [
+      "actual-self-improvement",
+      "agent-orchestration-multi-agent-optimize",
+      "agent-team-orchestration",
+      "agentic-workflow-automation",
+      "code-review",
+      "critical-code-reviewer",
+      "feature-specification",
+      "find-skills",
+      "gsd",
+      "planning-files",
+      "pre-mortem-analyst",
+      "requirements-analysis",
+      "security-auditor",
+      "technical-spec-design",
+      "vassili-clawhub-cli"
+    ],
+    "heartbeat": {
+      "command": "stask --project {{PROJECT_SLUG}} heartbeat {{LEAD_NAME_LOWER}}",
+      "interval": "10m"
+    },
+    "cron": []
+  },
+  "backend": {
+    "model": {
+      "primary": "ollama/glm-5.1:cloud",
+      "fallbacks": ["ollama/qwen3-coder-next:cloud", "ollama/qwen3.5:cloud"]
+    },
+    "skills": [
+      "actual-self-improvement",
+      "agentic-coding",
+      "api-dev",
+      "api-security-audit",
+      "code-review",
+      "database-migrations",
+      "debug-pro",
+      "docker-essentials",
+      "feature-specification",
+      "find-skills",
+      "fullstack-conventions",
+      "link-to-opencode",
+      "opencode",
+      "opencode-controller",
+      "paymentsdb",
+      "pull-request",
+      "security-auditor",
+      "sql-toolkit",
+      "stask-general",
+      "stask-worker",
+      "stripe-api",
+      "stripe-best-practices",
+      "supabase",
+      "technical-spec-design",
+      "vercel",
+      "vassili-clawhub-cli"
+    ],
+    "heartbeat": {
+      "command": "stask --project {{PROJECT_SLUG}} heartbeat {{BACKEND_NAME_LOWER}}",
+      "interval": "10m"
+    },
+    "cron": []
+  },
+  "frontend": {
+    "model": {
+      "primary": "ollama/qwen3.5:cloud",
+      "fallbacks": ["ollama/gemma4:31b-cloud", "ollama/minimax-m2.7:cloud"]
+    },
+    "skills": [
+      "actual-self-improvement",
+      "agentic-coding",
+      "code-review",
+      "feature-specification",
+      "figma-integration",
+      "find-skills",
+      "link-to-opencode",
+      "nextjs-expert",
+      "opencode",
+      "opencode-controller",
+      "react-expert",
+      "shadcn-ui",
+      "stask-general",
+      "stask-worker",
+      "tailwind-v4-shadcn",
+      "technical-spec-design",
+      "vassili-clawhub-cli"
+    ],
+    "heartbeat": {
+      "command": "stask --project {{PROJECT_SLUG}} heartbeat {{FRONTEND_NAME_LOWER}}",
+      "interval": "10m"
+    },
+    "cron": []
+  },
+  "qa": {
+    "model": {
+      "primary": "ollama/gemma4:31b-cloud",
+      "fallbacks": ["ollama/qwen3.5:cloud", "ollama/glm-5.1:cloud"]
+    },
+    "skills": [
+      "actual-self-improvement",
+      "afrexai-qa-test-plan",
+      "e2e-testing-patterns",
+      "feature-specification",
+      "find-skills",
+      "link-to-opencode",
+      "openclaw-api-tester",
+      "playwright-pro",
+      "qa-patrol",
+      "stask-general",
+      "stask-qa",
+      "technical-spec-design",
+      "vassili-clawhub-cli"
+    ],
+    "heartbeat": {
+      "command": "stask --project {{PROJECT_SLUG}} heartbeat {{QA_NAME_LOWER}}",
+      "interval": "10m"
+    },
+    "cron": []
+  }
+}

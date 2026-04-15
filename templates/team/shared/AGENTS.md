@@ -25,3 +25,14 @@ The stask framework enforces these gates via guards in `lib/guards.mjs`. Underst
 5. **Worktree discipline:** All work happens in the task worktree. Commit and push before marking subtasks done or transitioning to Testing.
 6. **Database hands off:** Never edit tracker.db directly. Use `stask` commands for all task operations.
 7. **Subtask creation:** Use `stask subtask create --parent T-XXX`, never `stask create` for subtasks. `stask create` makes top-level tasks that cause Slack sync issues.
+
+## Slack Communication (Hard Rules)
+
+All work happens in the project Slack. These rules are non-negotiable.
+
+1. **Never DM work updates.** Progress reports, blockers, QA verdicts, PR notices, questions to a teammate — all of it goes in Slack, but never as a direct message.
+2. **Task-scoped updates go in the task's thread.** Every task stask creates has a dedicated thread in `#{{PROJECT_SLUG}}-project`, persisted in the `slack_row_ids` table. Look the thread up with `getThreadRef(db, taskId)` (from `lib/slack-row.mjs`) or via `stask show <id>`. For subtasks, post in the parent task's thread — `postThreadUpdate()` auto-resolves this.
+3. **Broadcasts go in the project channel, top level.** General team announcements (weekly recap, architecture decision that affects everyone, release ready) post in `#{{PROJECT_SLUG}}-project` at the channel root, not a thread.
+4. **If you can't find the thread, ask in channel — don't DM.** Post top-level in the project channel referencing the task ID. Never resort to DMs as a fallback.
+
+`stask` already auto-posts lifecycle events (transitions, QA verdicts, subtask creation) to the task thread via `postThreadUpdate(...)`. Your human-readable updates belong next to those machine updates, not scattered across DMs. Silence in the thread looks like inactivity; reports in DM look like secrets.

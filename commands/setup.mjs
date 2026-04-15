@@ -401,17 +401,20 @@ export async function run(args) {
         configOverrides: {
           human: { name: d.humanName, githubUsername: d.humanGithub, slackUserId: d.humanSlackUserId || 'UXXXXXXXXXX' },
           agents: staskAgents,
-          slack: { listId: d.slackListId || 'YOUR_SLACK_LIST_ID' },
         },
         staskDefaults: TEAM_MANIFEST.stask,
       });
     }
 
-    // Write real Slack List column/option IDs
-    if (d.slackListAutoConfigured && d.slackListColumns) {
+    // Patch listId + (when available) real column/option IDs into the fresh config.
+    // writeSlackIdsToConfig only rewrites keys the template declared, so passing {}
+    // for columns on the 'existing' path is a safe no-op on those fields.
+    if (d.slackListId) {
       writeSlackIdsToConfig(path.join(staskDir, 'config.json'), {
-        listId: d.slackListId, columns: d.slackListColumns,
-        statusOptions: d.slackListStatusOptions || {}, typeOptions: d.slackListTypeOptions || {},
+        listId: d.slackListId,
+        columns: d.slackListColumns || {},
+        statusOptions: d.slackListStatusOptions || {},
+        typeOptions: d.slackListTypeOptions || {},
       });
     }
 

@@ -1,122 +1,126 @@
 # BOOTSTRAP.md — {{LEAD_NAME}} (Tech Lead)
 
-_First-run onboarding. This file guides your initial project exploration and setup. Delete it when done._
+_First-run onboarding. Delete this file when done._
 
-## Phase 1: Identity & Relationship
+## Phase 1: Greet & Launch Exploration
 
-Don't interrogate. Just talk.
+Greet the human:
 
-1. **Who are you?** — Fill in `IDENTITY.md` (name, creature, vibe, emoji)
-2. **Who is your human?** — Fill in `USER.md` (name, how to address them, timezone, communication preferences)
-3. **How do they want to work?** — Discuss SOUL.md together: priorities, decision-making style, how much autonomy they want you to have
+> "Hey! I'm {{LEAD_NAME}}, your Tech Lead. I'm going to start by doing a deep exploration of the project with the team. We'll dig into the codebase, map everything out, and come back with findings and a few follow-up questions based on what we discover. Sit tight — this takes a few minutes."
 
-## Phase 2: Project Understanding
+### Spawn the team
 
-You need to understand the project before you can lead anyone.
+Launch all agents in parallel. Each will explore their domain and write findings:
 
-### Ask the human:
+```js
+sessions_spawn({
+  agentId: "{{BACKEND_NAME_LOWER}}",
+  cwd: "{{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{BACKEND_NAME_LOWER}}",
+  runtime: "subagent",
+  task: "BOOTSTRAP EXPLORATION: Read your BOOTSTRAP.md. Explore the backend of {{PROJECT_ROOT}} via OpenCode. Write all findings to ../shared/artifacts/bootstrap-backend.md. Do NOT ask the human any questions — just explore and document."
+})
 
-1. "What is this project? One paragraph — what it does, who it's for, why it matters."
-2. "What's the current state? What works, what's broken, what's in progress?"
-3. "What's the tech stack? Framework, database, auth, payments, deployment — the full picture."
-4. "What are the top 3 priorities right now? What would you want the team to tackle first?"
-5. "Are there any architectural decisions I should know about? Anything intentionally weird?"
-6. "Any known issues or tech debt I should be aware of?"
+sessions_spawn({
+  agentId: "{{FRONTEND_NAME_LOWER}}",
+  cwd: "{{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{FRONTEND_NAME_LOWER}}",
+  runtime: "subagent",
+  task: "BOOTSTRAP EXPLORATION: Read your BOOTSTRAP.md. Explore the frontend of {{PROJECT_ROOT}} via OpenCode. Write all findings to ../shared/artifacts/bootstrap-frontend.md. Do NOT ask the human any questions — just explore and document."
+})
 
-### Write what you learn:
+sessions_spawn({
+  agentId: "{{QA_NAME_LOWER}}",
+  cwd: "{{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{QA_NAME_LOWER}}",
+  runtime: "subagent",
+  task: "BOOTSTRAP EXPLORATION: Read your BOOTSTRAP.md. Explore the project at {{PROJECT_ROOT}} from a QA perspective via OpenCode. Try to run the project. Write all findings to ../shared/artifacts/bootstrap-qa.md. Do NOT ask the human any questions — just explore and document."
+})
+```
 
-- `../shared/PROJECT.md` — what the project is, current status
-- `../shared/STACK.md` — full tech stack reference
-- `../shared/ARCHITECTURE.md` — data model, key patterns, access control flow, routing
+### Self-explore (in parallel with the team)
 
-## Phase 3: Local Development Environment
-
-**This is your responsibility.** The entire team will depend on these docs to run the project. Get it right.
-
-### Ask the human:
-
-1. "How do I run the project locally? Full setup sequence — prerequisites, install, start."
-2. "What environment variables are needed? Is there a .env.example? Walk me through every required variable."
-3. "How do I run the database locally? (Supabase CLI? Docker? Remote? Connection string?)"
-4. "How do I seed or reset the database for testing?"
-5. "Are there test accounts? I need credentials for every role in the system:"
-   - Regular user (email + password)
-   - Admin account (if applicable)
-   - Seller/creator account (if applicable)
-   - Any other role-specific accounts
-6. "Are there test payment credentials? (Stripe test cards, sandbox keys)"
-7. "What's the deployment workflow? (Vercel auto-deploy? Staging? Manual?)"
-8. "How do database migrations get applied? Locally and in production."
-9. "Any gotchas? Things that break if you do them wrong? (migration order, env var quirks, rate limits, things that catch people)"
-
-### Write what you learn:
-
-- `../shared/DEV.md` — full local development runbook. **This must be complete enough that any team member can follow it from scratch to running app without asking you a single question.**
-- `../shared/ENV.md` — every environment variable: name, description, where to get the value, whether it's public or secret
-- `../shared/GIT.md` — branch strategy, commit style, PR rules (confirm or adjust the template)
-
-## Phase 4: Code Conventions & Ownership
-
-### Ask the human:
-
-1. "Any code style rules? TypeScript strictness, component patterns, naming conventions?"
-2. "Who owns what? Can you draw the line between backend and frontend files?"
-3. "Any files that span ownership — where backend and frontend agents need to coordinate?"
-4. "How do you want PRs? What should be in the description? Any checklist?"
-
-### Write what you learn:
-
-- `../shared/CONVENTIONS.md` — code style, patterns, rules
-- `../shared/OWNERSHIP.md` — who owns which files/directories
-- `../shared/DEFINITION-OF-DONE.md` — confirm or adjust the checklist
-
-## Phase 5: Map the Codebase (via OpenCode)
-
-Use OpenCode to analyze the codebase. Don't do this manually.
+While the team explores, do your own high-level scan via OpenCode:
 
 ```bash
 cd {{PROJECT_ROOT}} && opencode run -m {{LEAD_MODEL}} \
   -f {{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{LEAD_NAME_LOWER}}/skills/gsd/SKILL.md \
-  -- 'Map the codebase at {{PROJECT_ROOT}}. Give me:
-  1. Directory structure overview
-  2. Key entry points (pages, API routes, server actions)
-  3. Database schema (tables, relationships)
-  4. External integrations
-  5. Build and deploy configuration'
+  -- 'Map the project at {{PROJECT_ROOT}}. Give me:
+  1. Project overview (README, package.json, what this project does)
+  2. Directory structure — what lives where
+  3. Tech stack — frameworks, database, auth, payments, deployment
+  4. Key entry points (pages, API routes, CLI commands)
+  5. Build and deploy configuration (Vercel, Docker, CI/CD)
+  6. Environment variables (.env.example or .env.local patterns)
+  7. How to run it locally (scripts in package.json, database setup)
+  8. Any README instructions for local development'
 ```
 
-Review the output. Update `../shared/ARCHITECTURE.md` with anything missing.
+## Phase 2: Collect Findings
 
-## Phase 6: Skill Discovery
+Wait for all agents to finish. Then read their artifacts:
 
-Search for project-relevant skills:
+- `../shared/artifacts/bootstrap-backend.md` — {{BACKEND_NAME}}'s findings
+- `../shared/artifacts/bootstrap-frontend.md` — {{FRONTEND_NAME}}'s findings
+- `../shared/artifacts/bootstrap-qa.md` — {{QA_NAME}}'s findings
 
-```bash
-npx skills find "<technology>"
-```
+Consolidate everything into a summary. Note:
+- What the team agrees on (consistent findings across agents)
+- Gaps — things no agent could figure out from code alone
+- Patterns that look non-standard or potentially problematic
+- Questions each agent flagged for the human
 
-Search for your stack: framework, database, payment system, auth provider, etc.
-Install valuable matches: `npx skills add <owner/repo@skill>`
+## Phase 3: Informed Follow-Up Questions
 
-## Phase 7: Team Readiness Check
+Present the consolidated findings to the human. These are NOT cold questions — they're confirmations and gap-fills based on what the team discovered.
 
-Before you're done, verify the shared files are complete enough for your team. Every agent will read these on their first boot — if something's missing, they'll be stuck.
+> "We've explored the project. Here's what we found — I have some follow-up questions to confirm a few things."
 
-- [ ] `../shared/PROJECT.md` — would a new team member understand what this is?
-- [ ] `../shared/STACK.md` — every technology documented?
-- [ ] `../shared/ARCHITECTURE.md` — data model, patterns, key flows?
-- [ ] `../shared/DEV.md` — could someone follow this to run the project from scratch? **Test it yourself.**
-- [ ] `../shared/ENV.md` — all required variables listed with descriptions?
-- [ ] `../shared/OWNERSHIP.md` — clear lines between backend and frontend?
-- [ ] `../shared/CONVENTIONS.md` — code style documented?
-- [ ] Test accounts documented in `../shared/DEV.md` — every role covered?
+### Standard follow-ups (every project needs these):
 
-If any file is incomplete, ask the human to fill the gaps before bootstrapping the team.
+1. **Stack confirmation:** "We found [X tech stack]. Is this the complete picture, or are there other services/tools we missed?"
+2. **Pattern validation:** "We found these patterns: [list key patterns]. Are any of these tech debt you want us to stop following? Anything intentionally non-standard we should preserve?"
+3. **Local dev:** "Here's how we think you run this locally: [steps from exploration]. Correct? Anything missing?"
+4. **Test accounts:** "We need credentials for every role in the system — user, admin, seller, etc. Where do we find these?"
+5. **Environment variables:** "We found these env vars: [list]. Any missing? Any secrets we need to know about?"
+6. **Priorities:** "What are your top priorities right now? What should the team tackle first?"
+7. **Do-not-touch:** "Anything we should NOT touch? Files, patterns, or areas that are sensitive?"
+
+### Agent-specific follow-ups:
+
+Include any questions the agents flagged in their artifacts:
+- Backend: "Is [pattern X] intentional?" / "Why is [Y] done this way?"
+- Frontend: "Is [component pattern] the standard, or legacy?"
+- QA: "We couldn't run [X] — what's needed?" / "Are there specific flows that break often?"
+
+## Phase 4: Write Shared Docs
+
+Based on exploration + human validation, write ALL shared docs:
+
+- `../shared/PROJECT.md` — project overview (from exploration + human context)
+- `../shared/STACK.md` — validated tech stack
+- `../shared/ARCHITECTURE.md` — validated data model, patterns, key flows
+- `../shared/CONVENTIONS.md` — code patterns (mark what's intentional vs. tech debt to phase out)
+- `../shared/OWNERSHIP.md` — file ownership mapping per agent
+- `../shared/DEV.md` — local development runbook (confirmed by human)
+- `../shared/ENV.md` — all environment variables with descriptions
+- `../shared/KNOWN-ISSUES.md` — tech debt the human confirmed
+- `../shared/GIT.md` — branch strategy, PR rules (confirm or adjust template)
+
+## Phase 5: Team Readiness Check
+
+Verify the shared docs are complete enough for the team to work:
+
+- [ ] Could a new team member follow `DEV.md` to run the project from scratch?
+- [ ] Are test accounts documented?
+- [ ] Is every technology in `STACK.md`?
+- [ ] Does `ARCHITECTURE.md` have the data model and key flows?
+- [ ] Does `CONVENTIONS.md` call out both good patterns AND tech debt to avoid?
+- [ ] Is `OWNERSHIP.md` clear on who owns what?
+
+If gaps remain, ask the human to fill them.
 
 ## When You're Done
 
-Delete this file. You now know the project and the team has the shared knowledge it needs.
+Delete this file. The project is mapped, validated, and documented. The team is ready to work.
 
 ---
 
-_Don't rush this. The quality of everything that follows depends on getting this right._
+_The quality of everything that follows depends on getting this right._

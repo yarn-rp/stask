@@ -149,12 +149,29 @@ sessions_spawn({
   label: "bootstrap-finalize",
   task: `FINALIZE BOOTSTRAP. You have no prior context — read these files to understand what to do:
 
-  1. Read ../shared/artifacts/bootstrap-briefing.md — this is your only source of truth
-  2. Read the existing template stubs in ../shared/ (PROJECT.md, STACK.md, ARCHITECTURE.md, CONVENTIONS.md, OWNERSHIP.md, DEV.md, ENV.md, KNOWN-ISSUES.md, GIT.md)
+  Sources of truth (read ALL of these before writing):
+  1. ../shared/artifacts/bootstrap-briefing.md — consolidated briefing (human-validated answers + decisions)
+  2. ../shared/artifacts/bootstrap-backend.md — {{BACKEND_NAME}}'s deep backend exploration (data model, APIs, integrations, patterns)
+  3. ../shared/artifacts/bootstrap-frontend.md — {{FRONTEND_NAME}}'s deep frontend exploration (routing, components, styling, state)
+  4. ../shared/artifacts/bootstrap-qa.md — {{QA_NAME}}'s QA exploration (test infrastructure, critical flows, runnability)
+  5. The existing template stubs in ../shared/ (PROJECT.md, STACK.md, ARCHITECTURE.md, CONVENTIONS.md, OWNERSHIP.md, DEV.md, ENV.md, KNOWN-ISSUES.md, GIT.md)
 
-  Then write each shared doc based on the briefing. Replace all placeholder/template content with real validated project info.
+  The briefing has the human-validated decisions (what's intentional vs. tech debt, priorities, do-not-touch). The agent artifacts have the deep technical detail. Use BOTH — briefing for the "what should we do", artifacts for the "what's actually in the code".
 
-  After all shared docs are written, clean up bootstrap artifacts:
+  Write each shared doc with detail pulled from the relevant artifacts:
+  - STACK.md → start from briefing, enrich with versions/details from backend + frontend artifacts
+  - ARCHITECTURE.md → pull data model from backend artifact, component/routing map from frontend artifact, key flows from all three
+  - CONVENTIONS.md → pull patterns from backend + frontend artifacts; mark tech debt per briefing
+  - OWNERSHIP.md → use "Recommended Scope" section from each agent artifact, reconcile conflicts per briefing
+  - DEV.md → start from briefing (validated commands); QA artifact tells you if it actually works
+  - ENV.md → from briefing + cross-reference with what was found in .env files during exploration
+  - KNOWN-ISSUES.md → tech debt items confirmed in briefing + any flagged in agent artifacts
+  - GIT.md → from briefing (confirmed branch strategy, PR rules)
+  - PROJECT.md → from briefing (project overview, current status, priorities)
+
+  Replace all placeholder/template content. These files become the team's source of truth.
+
+  After all shared docs are written and verified, clean up bootstrap artifacts:
   - Delete ../shared/artifacts/bootstrap-backend.md
   - Delete ../shared/artifacts/bootstrap-frontend.md
   - Delete ../shared/artifacts/bootstrap-qa.md

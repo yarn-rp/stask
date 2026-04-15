@@ -6,6 +6,8 @@
   "staleSessionMinutes": 30,
   "syncIntervalSeconds": 120,
   "maxQaRetries": 3,
+  "canvasSyncIntervalSeconds": 180,
+  "canvasSyncDirectories": ["../shared/"],
 
   "human": {
     "name": "YourName",

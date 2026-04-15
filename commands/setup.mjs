@@ -344,6 +344,9 @@ export async function run(args) {
     } else if (listChoice === 'create') {
       await stepList(s, ctx);
       d.slackListId = ctx.listId;
+      d.slackListColumns = ctx.listColumns;
+      d.slackListStatusOptions = ctx.listStatusOptions;
+      d.slackListTypeOptions = ctx.listTypeOptions;
       d.slackListAutoConfigured = true;
     } else {
       d.slackListId = '';

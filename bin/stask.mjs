@@ -34,7 +34,7 @@ import { fileURLToPath } from 'url';
 }
 
 // Commands that don't need a project context (work with global registry only)
-const NO_PROJECT_COMMANDS = new Set(['init', 'projects', 'heartbeat-all']);
+const NO_PROJECT_COMMANDS = new Set(['init', 'projects', 'heartbeat-all', 'setup', 'teardown']);
 
 const _cmd = process.argv[2];
 if (NO_PROJECT_COMMANDS.has(_cmd)) {
@@ -179,6 +179,10 @@ Multi-project commands:
   init <name> --repo <path>     Create a new stask project
   projects [show <name>]        List/show registered projects
   heartbeat-all <agent-name>    Get pending work across all projects
+
+Team bootstrap commands:
+  setup [path]                  Interactive wizard: scaffold workspace, Slack apps, cron, openclaw.json
+  teardown <slug> [--force]     Remove workspace, agents, cron jobs, and .stask/ for a project
 
 Global flags:
   --project <name>              Target a specific project (otherwise auto-detected from cwd)

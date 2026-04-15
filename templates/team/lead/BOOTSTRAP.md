@@ -90,36 +90,93 @@ Include any questions the agents flagged in their artifacts:
 - Frontend: "Is [component pattern] the standard, or legacy?"
 - QA: "We couldn't run [X] — what's needed?" / "Are there specific flows that break often?"
 
-## Phase 4: Write Shared Docs
+## Phase 4: Write the Briefing
 
-Based on exploration + human validation, write ALL shared docs:
+Your context is full of exploration logs and agent artifacts at this point. Instead of writing all the shared docs here (which would bloat context further), consolidate everything into a single briefing file and hand off to a fresh session.
 
-- `../shared/PROJECT.md` — project overview (from exploration + human context)
-- `../shared/STACK.md` — validated tech stack
-- `../shared/ARCHITECTURE.md` — validated data model, patterns, key flows
-- `../shared/CONVENTIONS.md` — code patterns (mark what's intentional vs. tech debt to phase out)
-- `../shared/OWNERSHIP.md` — file ownership mapping per agent
-- `../shared/DEV.md` — local development runbook (confirmed by human)
-- `../shared/ENV.md` — all environment variables with descriptions
-- `../shared/KNOWN-ISSUES.md` — tech debt the human confirmed
-- `../shared/GIT.md` — branch strategy, PR rules (confirm or adjust template)
+Write `../shared/artifacts/bootstrap-briefing.md` with:
 
-## Phase 5: Team Readiness Check
+```markdown
+# Bootstrap Briefing
 
-Verify the shared docs are complete enough for the team to work:
+## Project
+[Overview, current status, top priorities — from human]
 
-- [ ] Could a new team member follow `DEV.md` to run the project from scratch?
-- [ ] Are test accounts documented?
-- [ ] Is every technology in `STACK.md`?
-- [ ] Does `ARCHITECTURE.md` have the data model and key flows?
-- [ ] Does `CONVENTIONS.md` call out both good patterns AND tech debt to avoid?
-- [ ] Is `OWNERSHIP.md` clear on who owns what?
+## Stack (validated)
+[Tech stack — confirmed by human]
 
-If gaps remain, ask the human to fill them.
+## Local Development (validated)
+[How to run it — confirmed steps, required env vars, test accounts]
+
+## Architecture
+[Data model, key patterns, access control flow, routing — from exploration + human validation]
+
+## Conventions
+[Code patterns to follow — what's intentional]
+
+## Tech Debt (confirmed by human)
+[Patterns to phase out, anti-patterns to avoid, do-not-touch areas]
+
+## Ownership
+[File ownership mapping per agent — based on exploration]
+
+## Environment Variables
+[Full list with descriptions and where to get values]
+
+## Git & PR Rules
+[Branch strategy, commit style, PR requirements]
+
+## Known Issues
+[Existing tech debt, fragile areas, stuff that looks wrong but is intentional]
+
+## Agent Artifact References
+- Backend exploration: ../shared/artifacts/bootstrap-backend.md
+- Frontend exploration: ../shared/artifacts/bootstrap-frontend.md
+- QA exploration: ../shared/artifacts/bootstrap-qa.md
+```
+
+Make the briefing self-contained. A fresh session with no prior context should be able to write all the shared docs from it.
+
+## Phase 5: Hand Off to Fresh Session
+
+Spawn a fresh session to do the mechanical work of writing all shared docs. This keeps your own context clean — you're done after this spawn.
+
+```js
+sessions_spawn({
+  agentId: "{{LEAD_NAME_LOWER}}",
+  cwd: "{{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{LEAD_NAME_LOWER}}",
+  runtime: "subagent",
+  label: "bootstrap-finalize",
+  task: `FINALIZE BOOTSTRAP. You have no prior context — read these files to understand what to do:
+
+  1. Read ../shared/artifacts/bootstrap-briefing.md — this is your only source of truth
+  2. Read the existing template stubs in ../shared/ (PROJECT.md, STACK.md, ARCHITECTURE.md, CONVENTIONS.md, OWNERSHIP.md, DEV.md, ENV.md, KNOWN-ISSUES.md, GIT.md)
+
+  Then write each shared doc based on the briefing. Replace all placeholder/template content with real validated project info.
+
+  After all shared docs are written, clean up bootstrap artifacts:
+  - Delete ../shared/artifacts/bootstrap-backend.md
+  - Delete ../shared/artifacts/bootstrap-frontend.md
+  - Delete ../shared/artifacts/bootstrap-qa.md
+  - Delete ../shared/artifacts/bootstrap-briefing.md
+  - Delete {{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{LEAD_NAME_LOWER}}/BOOTSTRAP.md
+  - Delete {{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{BACKEND_NAME_LOWER}}/BOOTSTRAP.md
+  - Delete {{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{FRONTEND_NAME_LOWER}}/BOOTSTRAP.md
+  - Delete {{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{QA_NAME_LOWER}}/BOOTSTRAP.md
+
+  Report back: "Bootstrap finalized. Team is ready."`
+})
+```
 
 ## When You're Done
 
-Delete this file. The project is mapped, validated, and documented. The team is ready to work.
+Once you've spawned the finalize session, your job is done. The fresh session will:
+1. Read the briefing (clean context, no exploration bloat)
+2. Write all shared docs
+3. Delete all bootstrap files and artifacts
+4. Report back
+
+Tell the human: "Exploration complete. I've handed off to a fresh session to write the final docs and clean up. Give it a minute — when it's done, the team will be fully set up."
 
 ---
 

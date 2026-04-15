@@ -1,0 +1,89 @@
+{
+  "role": "frontend",
+  "title": "Frontend Engineer",
+  "description": "Pages, components, styling",
+
+  "model": {
+    "primary": "ollama/qwen3.5:cloud",
+    "fallbacks": ["ollama/gemma4:31b-cloud", "ollama/minimax-m2.7:cloud"]
+  },
+
+  "skills": {
+    "clawhub": [
+      "agentic-coding",
+      "react-expert",
+      "nextjs-expert",
+      "shadcn-ui",
+      "tailwind-v4-shadcn",
+      "figma-integration"
+    ],
+    "shareFromLead": [
+      "code-review",
+      "feature-specification",
+      "technical-spec-design"
+    ],
+    "stask": ["stask-general", "stask-worker"]
+  },
+
+  "cron": {
+    "heartbeat": "10,30,50 * * * *"
+  },
+
+  "subagents": "lead-only",
+
+  "slack": {
+    "color": "#721bcf",
+    "manifest": {
+      "display_information": {
+        "name": "{{AGENT_DISPLAY_NAME}}",
+        "description": "{{AGENT_DESCRIPTION}}",
+        "background_color": "{{AGENT_COLOR}}"
+      },
+      "features": {
+        "bot_user": {
+          "display_name": "{{AGENT_DISPLAY_NAME}}",
+          "always_online": true
+        }
+      },
+      "oauth_config": {
+        "scopes": {
+          "bot": [
+            "app_mentions:read",
+            "channels:history",
+            "channels:join",
+            "channels:read",
+            "chat:write",
+            "files:read",
+            "files:write",
+            "groups:history",
+            "groups:read",
+            "im:history",
+            "im:read",
+            "im:write",
+            "lists:read",
+            "lists:write",
+            "reactions:read",
+            "reactions:write",
+            "users:read"
+          ]
+        }
+      },
+      "settings": {
+        "event_subscriptions": {
+          "bot_events": [
+            "app_mention",
+            "message.channels",
+            "message.groups",
+            "message.im"
+          ]
+        },
+        "interactivity": {
+          "is_enabled": false
+        },
+        "org_deploy_enabled": false,
+        "socket_mode_enabled": true,
+        "token_rotation_enabled": false
+      }
+    }
+  }
+}

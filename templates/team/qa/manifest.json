@@ -1,0 +1,87 @@
+{
+  "role": "qa",
+  "title": "QA Engineer",
+  "description": "Browser tests, API tests, reports",
+
+  "model": {
+    "primary": "ollama/gemma4:31b-cloud",
+    "fallbacks": ["ollama/qwen3.5:cloud", "ollama/glm-5.1:cloud"]
+  },
+
+  "skills": {
+    "clawhub": [
+      "qa-patrol",
+      "playwright-pro",
+      "e2e-testing-patterns",
+      "afrexai-qa-test-plan",
+      "openclaw-api-tester"
+    ],
+    "shareFromLead": [
+      "feature-specification",
+      "technical-spec-design"
+    ],
+    "stask": ["stask-general", "stask-qa"]
+  },
+
+  "cron": {
+    "heartbeat": "15,35,55 * * * *"
+  },
+
+  "subagents": "lead-only",
+
+  "slack": {
+    "color": "#7d792c",
+    "manifest": {
+      "display_information": {
+        "name": "{{AGENT_DISPLAY_NAME}}",
+        "description": "{{AGENT_DESCRIPTION}}",
+        "background_color": "{{AGENT_COLOR}}"
+      },
+      "features": {
+        "bot_user": {
+          "display_name": "{{AGENT_DISPLAY_NAME}}",
+          "always_online": true
+        }
+      },
+      "oauth_config": {
+        "scopes": {
+          "bot": [
+            "app_mentions:read",
+            "channels:history",
+            "channels:join",
+            "channels:read",
+            "chat:write",
+            "files:read",
+            "files:write",
+            "groups:history",
+            "groups:read",
+            "im:history",
+            "im:read",
+            "im:write",
+            "lists:read",
+            "lists:write",
+            "reactions:read",
+            "reactions:write",
+            "users:read"
+          ]
+        }
+      },
+      "settings": {
+        "event_subscriptions": {
+          "bot_events": [
+            "app_mention",
+            "message.channels",
+            "message.groups",
+            "message.im"
+          ]
+        },
+        "interactivity": {
+          "is_enabled": false
+        },
+        "org_deploy_enabled": false,
+        "socket_mode_enabled": true,
+        "token_rotation_enabled": false
+      }
+    }
+  }
+}

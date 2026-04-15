@@ -28,14 +28,14 @@ function parseArgs(args) {
   return opts;
 }
 
-const CONFIG_TEMPLATE = (name, specsDir, worktreeBaseDir) => ({
+const CONFIG_TEMPLATE = (name, specsDir, worktreeBaseDir, staskDefaults) => ({
   project: name,
   specsDir,
   projectRepoPath: '.',
   worktreeBaseDir,
-  staleSessionMinutes: 30,
-  syncIntervalSeconds: 60,
-  maxQaRetries: 3,
+  staleSessionMinutes: staskDefaults?.staleSessionMinutes ?? 30,
+  syncIntervalSeconds: staskDefaults?.syncIntervalSeconds ?? 60,
+  maxQaRetries: staskDefaults?.maxQaRetries ?? 3,
 
   human: {
     name: 'YourName',
@@ -93,6 +93,28 @@ FILE_REGISTRY.json
 logs/
 pr-status/
 `;
+
+/**
+ * Programmatic init — called by setup.mjs with pre-configured options.
+ */
+export function initProject({ name, repoPath, configOverrides, staskDefaults }) {
+  const staskDir = path.join(repoPath, '.stask');
+  const specsDir = './specs';
+  const worktreeBaseDir = path.join(GLOBAL_STASK_DIR, 'worktrees', name);
+
+  fs.mkdirSync(staskDir, { recursive: true });
+
+  const config = CONFIG_TEMPLATE(name, specsDir, worktreeBaseDir, staskDefaults);
+  if (configOverrides) Object.assign(config, configOverrides);
+  fs.writeFileSync(path.join(staskDir, 'config.json'), JSON.stringify(config, null, 2) + '\n');
+
+  fs.writeFileSync(path.join(staskDir, '.gitignore'), GITIGNORE_CONTENT);
+
+  const registry = loadProjectsRegistry();
+  registry.projects = registry.projects || {};
+  registry.projects[name] = { repoPath };
+  saveProjectsRegistry(registry);
+}
 
 export async function run(args) {
   const opts = parseArgs(args);

@@ -73,14 +73,11 @@ sessions_spawn({
 - `../shared/OWNERSHIP.md` — who owns what
 - `../shared/TEAM.md` — the crew
 
-## OpenCode Mirror
+## How to Use OpenCode (Primary Tool)
 
-OpenCode is available as an alternative coding tool using your model (`{{LEAD_MODEL}}`).
-Skills are NOT mirrored — attach your own skill files directly via `-f`.
+**All code work goes through OpenCode.** You do not write, analyze, or review code directly. OpenCode is your hands — you orchestrate, it executes. Only fall back to doing it yourself if OpenCode is unavailable.
 
-### How to invoke it
-
-For any coding task, attach the relevant skill(s) via `-f`:
+Attach the relevant skill(s) via `-f` for every invocation:
 
 ```bash
 cd {{PROJECT_ROOT}} && opencode run -m {{LEAD_MODEL}} \
@@ -88,7 +85,7 @@ cd {{PROJECT_ROOT}} && opencode run -m {{LEAD_MODEL}} \
   -- 'Your task here'
 ```
 
-### Multi-skill example
+Multi-skill example:
 
 ```bash
 cd {{PROJECT_ROOT}} && opencode run -m {{LEAD_MODEL}} \
@@ -99,8 +96,9 @@ cd {{PROJECT_ROOT}} && opencode run -m {{LEAD_MODEL}} \
 
 ### Rules
 
+- **Always use OpenCode first** — it is the primary tool for all code work
 - **Always use `-m {{LEAD_MODEL}}`** — this is your assigned model
 - **Always attach relevant skills via `-f`** — bare OpenCode has no domain context
 - **You orchestrate, it executes** — review output before handing off
-- Skills live in your workspace at `{{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{LEAD_NAME_LOWER}}/skills/` — no syncing needed
-- If skills change, no action needed — OpenCode reads them directly each time
+- Skills live at `{{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{LEAD_NAME_LOWER}}/skills/`
+- Only attempt code tasks yourself as a last resort if OpenCode fails

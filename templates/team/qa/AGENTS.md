@@ -46,12 +46,11 @@ Reports are automatically synced to Slack via workspace-sync. Just write them to
 - `../shared/OWNERSHIP.md` — who owns what
 - `../shared/TEAM.md` — the crew
 
-## How to Invoke OpenCode
+## How to Use OpenCode (Primary Tool)
 
-OpenCode is your testing tool using your model (`{{QA_MODEL}}`).
-Attach your own skill files directly via `-f`.
+**All testing and code analysis goes through OpenCode.** You do not write test scripts or analyze code directly. OpenCode is your hands — you orchestrate, it executes. Only fall back to doing it yourself if OpenCode is unavailable.
 
-For any testing task, attach the relevant skill(s) via `-f`:
+Attach the relevant skill(s) via `-f` for every invocation:
 
 ```bash
 cd {{PROJECT_ROOT}} && opencode run -m {{QA_MODEL}} \
@@ -68,9 +67,11 @@ cd {{PROJECT_ROOT}} && opencode run -m {{QA_MODEL}} \
   -- 'Your task here'
 ```
 
-Rules:
+### Rules
+
+- **Always use OpenCode first** — it is the primary tool for all testing and code analysis
 - **Always use `-m {{QA_MODEL}}`** — this is your assigned model
 - **Always attach relevant skills via `-f`** — bare OpenCode has no domain context
 - **You orchestrate, it executes** — review output before handing off
-- Skills live in your workspace at `{{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{QA_NAME_LOWER}}/skills/`
-- If skills change, no action needed — OpenCode reads them directly each time
+- Skills live at `{{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{QA_NAME_LOWER}}/skills/`
+- Only attempt tasks yourself as a last resort if OpenCode fails

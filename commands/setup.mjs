@@ -386,7 +386,7 @@ export async function run(args) {
       slug: d.projectSlug, repoPath: d.repoPath, leadToken: d.slackAccounts[d.agents[LEAD_ROLE.id].name]?.botToken,
     });
 
-    await stepOpenclaw(s, regCtx, agentModels, TEAM_MANIFEST);
+    await stepOpenclaw(s, regCtx, agentModels, TEAM_MANIFEST, d.slackAccounts);
     await stepCron(s, regCtx, AGENT_MANIFESTS);
 
     // stask project init

@@ -2,11 +2,83 @@
 
 _First-run onboarding. This file guides your initial project exploration and setup. Delete it when done._
 
-## Phase 1: Deep Frontend Analysis
+## Phase 1: Read the Shared Knowledge
 
-You need to understand every client-side system before writing a single line of code.
+{{LEAD_NAME}} has already documented how to run the project and the tech stack. **Read these first** — don't ask the human questions that are already answered:
 
-### 1. Map the Frontend
+- `../shared/PROJECT.md` — what the project is
+- `../shared/STACK.md` — full tech stack
+- `../shared/ARCHITECTURE.md` — data model, patterns, flows
+- `../shared/CONVENTIONS.md` — code style and rules
+- `../shared/OWNERSHIP.md` — who owns what
+- `../shared/DEV.md` — **how to run the project locally** (follow this to get the app running)
+- `../shared/ENV.md` — environment variables
+
+If any of these are missing or incomplete, tell {{LEAD_NAME}} to fix them before you proceed.
+
+## Phase 2: Verify You Can Run It
+
+Follow `../shared/DEV.md` and actually run the project. Don't skip this.
+
+- [ ] Install dependencies
+- [ ] Start the dev server
+- [ ] Open the app in a browser
+- [ ] Log in with the test account from DEV.md
+- [ ] Check both light and dark mode
+- [ ] Check at least one page at mobile width (375px)
+
+If anything fails, tell {{LEAD_NAME}} — the docs need fixing.
+
+## Phase 3: Deep Frontend Interview
+
+Now ask the human questions **specific to your domain** that {{LEAD_NAME}} wouldn't have covered:
+
+### Design System & Visual Language
+1. "What's the design system? (shadcn/ui, MUI, custom components, or a mix?)"
+2. "Where are the base components vs custom components? What's the directory structure?"
+3. "Are there design tokens? (colors, spacing, typography, breakpoints — where are they defined?)"
+4. "Is there a Figma file, design reference, or style guide I should follow?"
+5. "Any brand guidelines? (specific colors, fonts, logo usage rules)"
+
+### Component Architecture
+6. "What's the component pattern? (server-first? client-heavy? mixed?)"
+7. "How do you handle state? (React hooks, context, Zustand, server state via fetch/SWR?)"
+8. "What's the data fetching pattern? (server components, client fetch, server actions?)"
+9. "How do forms work? (React Hook Form + Zod? Native? Something else?)"
+10. "Any animation library? (Framer Motion, CSS transitions, none?)"
+
+### UI Standards
+11. "What does 'done' look like for a frontend task? Specifically:"
+    - Do I need to test responsive at specific breakpoints? Which ones?
+    - Is dark mode mandatory on every component?
+    - Do I need loading skeletons for async data?
+    - Do I need empty states for every list/grid?
+12. "Any pages or components I should look at as 'the gold standard' — the best example of how things should be built?"
+
+### Frontend-Specific Gotchas
+13. "Any components that are fragile or tricky? Things that break easily?"
+14. "Any CSS or styling gotchas? (z-index wars, global style conflicts, Tailwind purging issues)"
+15. "Anything that looks wrong but is intentional? (So I don't 'fix' it)"
+
+### Assets & Media
+16. "Where do images and assets live? (public folder, CDN, Supabase storage?)"
+17. "Any image optimization patterns I should follow? (next/image, lazy loading, etc.)"
+
+### Write what you learn:
+
+Update `TOOLS.md` with:
+- Component library reference and directory structure
+- Design token locations
+- Key breakpoints for responsive testing
+- Figma/design reference links
+- Frontend-specific gotchas
+
+Update shared docs if you found errors or gaps:
+- `../shared/STACK.md` — frontend stack corrections
+- `../shared/CONVENTIONS.md` — component patterns, naming, styling rules
+- `../shared/KNOWN-ISSUES.md` — any frontend tech debt
+
+## Phase 4: Map the Frontend (via OpenCode)
 
 Use OpenCode to scan your domain:
 
@@ -18,91 +90,30 @@ cd {{PROJECT_ROOT}} && opencode run -m {{FRONTEND_MODEL}} \
   - Components — structure, shared vs page-specific, design system
   - Hooks — custom hooks, what state they manage
   - Styling — Tailwind config, CSS variables, design tokens, themes
-  - State management — client state, server state, form state
   - Data fetching — how data flows from server to UI
   - Types — where TypeScript types live, key interfaces'
 ```
 
-### 2. Understand the Design System
+Cross-reference with what the human told you. Update `../shared/ARCHITECTURE.md` with anything missing.
 
-Map the visual layer:
-- What component library is used? (shadcn, MUI, custom)
-- Where are base components vs custom components?
-- Design tokens: colors, spacing, typography, breakpoints
-- Dark mode: how it works, where it's configured
-- Animations: what library, what patterns
-
-### 3. Map Data Flow
-
-For each major page:
-- What data does it need?
-- Where does it come from? (server component fetch, client fetch, server action)
-- What state is client-only vs server-synced?
-- What happens on error? Loading? Empty?
-
-### 4. Review Shared Knowledge
-
-Read and verify what {{LEAD_NAME}} documented:
-- `../shared/STACK.md` — Does the frontend stack match what you found?
-- `../shared/ARCHITECTURE.md` — Are the routing and component patterns accurate?
-- `../shared/CONVENTIONS.md` — Are the frontend conventions followed?
-
-**Update anything that's wrong or missing.** You are the frontend authority.
-
-## Phase 2: Environment Setup Interview
-
-Ask the human these critical questions.
-
-### Local Development
-1. "How do I run the dev server? What port?"
-2. "Any environment variables specific to the frontend? (public API URLs, feature flags)"
-3. "Does the frontend need the backend running locally? Or can I develop against a staging API?"
-
-### Design & Assets
-4. "Is there a Figma file or design reference I should follow?"
-5. "Any brand guidelines? (colors, fonts, logo usage)"
-6. "Where do images and assets live? (public folder, CDN, Supabase storage)"
-
-### Testing & Credentials
-7. "Are there test accounts I can log in with? (user, admin, seller, etc.)"
-8. "What URL do I test against locally? (localhost:3000?)"
-9. "Any browser-specific requirements? (Chrome-only features, mobile-specific flows)"
-
-### Write what you learn:
-
-Update `TOOLS.md` with:
-- Dev server command and URL
-- Component library reference
-- Design token locations
-- Test account info (where to find credentials, not the secrets themselves)
-- Key breakpoints for responsive testing
-
-Update shared docs if {{LEAD_NAME}} missed anything:
-- `../shared/STACK.md` — frontend stack corrections
-- `../shared/CONVENTIONS.md` — component patterns, naming, styling rules
-
-## Phase 3: Skill Discovery
-
-Search for frontend-relevant skills:
+## Phase 5: Skill Discovery
 
 ```bash
-npx skills find "<technology>"
+npx skills find "<your-component-library>"
+npx skills find "<your-css-framework>"
+npx skills find "<your-animation-library>"
+npx skills find "<your-framework>"
 ```
 
-Search for your stack: component library, CSS framework, animation library, form library, etc.
 Install valuable matches: `npx skills add <owner/repo@skill>`
 
-## Phase 4: Verify You Can Run It
+## Phase 6: Enrich Your SOUL.md
 
-Before you're done, actually verify:
-
-- [ ] Dev server starts without errors
-- [ ] You can load the app in a browser
-- [ ] You can log in with a test account
-- [ ] You've checked both light and dark mode
-- [ ] You've checked at least one page at mobile width (375px)
-- [ ] `TOOLS.md` has everything you need to do your job
-- [ ] `../shared/STACK.md` accurately reflects the frontend stack
+Now that you know the project, fill in the blanks in SOUL.md:
+- **Your Stack** — actual technologies, versions, design system
+- **Your Scope** — actual file paths you own
+- **Design Principles** — project-specific rules (from interview + CONVENTIONS.md)
+- **Boundaries** — specific examples of what's yours vs {{BACKEND_NAME}}'s
 
 ## When You're Done
 
@@ -110,4 +121,4 @@ Delete this file. You now know the frontend inside out.
 
 ---
 
-_Don't rush this. Missing a component pattern or state management approach now means inconsistency later._
+_Don't rush this. Missing a component pattern or design system convention now means inconsistency later._

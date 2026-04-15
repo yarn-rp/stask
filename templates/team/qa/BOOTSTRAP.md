@@ -2,89 +2,80 @@
 
 _First-run onboarding. This file guides your initial project exploration and setup. Delete it when done._
 
-## Phase 1: You Need to Run This Project
+## Phase 1: Read the Shared Knowledge
 
-Before you can test anything, you need to be able to run it. This is non-negotiable.
+{{LEAD_NAME}} has already documented how to run the project, the tech stack, and test accounts. **Read these first** — don't ask the human questions that are already answered:
 
-### Ask the human:
+- `../shared/PROJECT.md` — what the project is
+- `../shared/STACK.md` — full tech stack
+- `../shared/ARCHITECTURE.md` — data model, patterns, flows
+- `../shared/CONVENTIONS.md` — code style and rules
+- `../shared/DEV.md` — **how to run the project locally + test accounts** (follow this exactly)
+- `../shared/ENV.md` — environment variables
+- `../shared/DEFINITION-OF-DONE.md` — the checklist you'll verify against
 
-1. "How do I start the project locally? Full command sequence — install, database, server."
-2. "What URL does the app run on locally? (localhost:3000?)"
-3. "Does the database need to be running? How do I start it?"
-4. "How do I reset the database to a clean state for testing?"
+If any of these are missing or incomplete — especially DEV.md or test accounts — tell {{LEAD_NAME}} to fix them before you proceed.
 
-### Get Test Accounts
+## Phase 2: Verify You Can Run It
 
-You cannot test without logging in. Get these from the human:
+Follow `../shared/DEV.md` and actually run the project. **This is non-negotiable.** You cannot test what you cannot run.
 
-5. "What test accounts exist? I need at minimum:"
-   - A regular user account (email + password)
-   - An admin account (if the app has admin features)
-   - A seller/creator account (if there's a marketplace or multi-role system)
-6. "Are there test payment credentials? (Stripe test cards, sandbox API keys)"
-7. "Any other service accounts I need? (OAuth test users, API keys for integrations)"
-
-**Write these to `TOOLS.md` immediately.** You will need them every single time you test.
-
-### Verify It Works
-
-Don't just write it down — actually do it:
-
-- [ ] Run the full startup sequence
+- [ ] Install dependencies
+- [ ] Start the database (if required)
+- [ ] Start the dev server
 - [ ] Open the app in a browser
-- [ ] Log in with the test user account
-- [ ] Log in with the admin account (if applicable)
+- [ ] Log in with the regular user test account
+- [ ] Log in with the admin test account (if applicable)
 - [ ] Verify the database has test data
 
-If any step fails, **stop and resolve it with the human**. You cannot do your job if you can't run the project.
+If any step fails, **stop and tell {{LEAD_NAME}}**. The shared docs need fixing.
 
-## Phase 2: Understand the Test Infrastructure
+## Phase 3: Deep QA Interview
 
-### Ask the human:
+Now ask the human questions **specific to testing** that {{LEAD_NAME}} wouldn't have covered:
 
-1. "Are there existing E2E tests? (Playwright, Cypress, manual-only?)"
-2. "If Playwright is set up, how do I run the test suite?"
-3. "Do I need to install any browser dependencies? (`npx playwright install`?)"
-4. "Where should I save QA reports? (confirm `../shared/qa-reports/`)"
-5. "Where should I save screenshots? (confirm `../shared/qa-reports/screenshots/`)"
-6. "How do you want bug reports formatted? (confirm the report template in SOUL.md)"
+### Test Environments & Access
+1. "Are there any test environments beyond local? (staging, preview deployments?)"
+2. "If there's a staging environment, how do I access it? Same test accounts?"
+3. "Are there any features that only work in specific environments? (payments in staging only, etc.)"
 
-### Write what you learn to `TOOLS.md`:
+### Browser & Device Requirements
+4. "What browsers do I need to test? (Chrome only? Safari? Firefox? Mobile?)"
+5. "What are the key breakpoints? (mobile 375px, tablet 768px, desktop 1440px — or different?)"
+6. "Is there any browser-specific functionality I should watch for? (WebRTC, Web Workers, etc.)"
 
-```markdown
-### Running the Project
-- Start: `<full startup command>`
-- URL: `<local URL>`
-- Database: `<how to start/reset>`
+### Test Infrastructure
+7. "Are there existing E2E tests? (Playwright, Cypress, manual-only?)"
+8. "If Playwright exists, how do I run the suite? Any setup needed? (`npx playwright install`?)"
+9. "Do you want me to write persistent test suites, or is manual browser testing enough?"
+10. "Are there specific testing tools or services I should use? (BrowserStack, Lighthouse, etc.)"
 
-### Test Accounts
-- User: `<where to find credentials>`
-- Admin: `<where to find credentials>`
-- Payment test cards: `<reference>`
+### User Flows & Critical Paths
+11. "What are the most critical user flows? The ones that absolutely cannot break:"
+    - Main happy path (signup → core action → result)
+    - Payment flow (if applicable)
+    - Auth flow (login, logout, session, OAuth)
+12. "Any flows that are particularly fragile or have broken before?"
+13. "Are there multi-user flows I need to test? (e.g., buyer and seller interactions)"
 
-### QA Commands
-- Run Playwright: `<command>`
-- Install browsers: `<command>`
-- QA report location: `../shared/qa-reports/`
-- Screenshot location: `../shared/qa-reports/screenshots/`
-```
+### QA Process Preferences
+14. "How detailed do you want QA reports? The full template with screenshots, or lighter-weight?"
+15. "Any specific acceptance criteria patterns you prefer? (Given/When/Then? Checklist?)"
+16. "When I find a bug — do I report it to {{LEAD_NAME}} in the thread, or is there another process?"
 
-## Phase 3: Read the Shared Knowledge
+### Write what you learn:
 
-Read everything the Lead documented. You need this context to write good tests:
-
-- `../shared/PROJECT.md` — what the project does (test against user expectations, not just ACs)
-- `../shared/STACK.md` — what's the tech stack (affects how you test)
-- `../shared/ARCHITECTURE.md` — data model and flows (helps you find edge cases)
-- `../shared/CONVENTIONS.md` — code patterns (helps you know what's intentional vs buggy)
-- `../shared/DEV.md` — dev runbook (your startup reference)
-- `../shared/DEFINITION-OF-DONE.md` — the checklist you're verifying against
-
-If anything is missing or wrong, tell {{LEAD_NAME}}.
+Update `TOOLS.md` with:
+- Full startup command sequence (copy from DEV.md + any QA-specific additions)
+- Test account credentials (where to find them — DEV.md section reference)
+- Test environment URLs (local, staging if applicable)
+- Browser testing checklist (breakpoints, browsers, dark mode)
+- Playwright/E2E commands (if applicable)
+- QA report and screenshot paths
 
 ## Phase 4: Set Up Your Testing Environment (via OpenCode)
 
-Use OpenCode to prepare your testing setup:
+Use OpenCode to verify your setup works end-to-end:
 
 ```bash
 cd {{PROJECT_ROOT}} && opencode run -m {{QA_MODEL}} \
@@ -93,19 +84,20 @@ cd {{PROJECT_ROOT}} && opencode run -m {{QA_MODEL}} \
   1. Can you reach the app at the local URL?
   2. Can you log in with test credentials?
   3. Take a screenshot of the homepage
-  4. Take a screenshot of the dashboard (if authenticated)
+  4. Take a screenshot of the main authenticated page
   Save screenshots to {{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/shared/qa-reports/screenshots/'
 ```
 
-## Phase 5: Skill Discovery
+If this fails, your setup isn't complete. Debug before proceeding.
 
-Search for testing-relevant skills:
+## Phase 5: Skill Discovery
 
 ```bash
 npx skills find "qa"
 npx skills find "playwright"
 npx skills find "testing"
 npx skills find "browser"
+npx skills find "accessibility"
 ```
 
 Install valuable matches: `npx skills add <owner/repo@skill>`
@@ -114,13 +106,13 @@ Install valuable matches: `npx skills add <owner/repo@skill>`
 
 Before you're done, verify all of this:
 
-- [ ] You can start the project from scratch in under 2 minutes
+- [ ] You can start the project and open it in a browser in under 2 minutes
 - [ ] You can log in with at least one test account
-- [ ] You know where to save QA reports and screenshots
-- [ ] You know how to submit a verdict (`stask qa <id> --report ... --verdict PASS|FAIL`)
-- [ ] `TOOLS.md` has your full testing runbook (startup, accounts, commands)
-- [ ] You've read all shared knowledge files
-- [ ] You've taken at least one test screenshot to verify your browser automation works
+- [ ] You can take a screenshot via OpenCode (browser automation works)
+- [ ] You know the critical user flows and what breakpoints to test
+- [ ] `TOOLS.md` has your full testing runbook
+- [ ] You've read the DEFINITION-OF-DONE.md checklist
+- [ ] You know how to submit a verdict: `stask qa <id> --report ... --verdict PASS|FAIL`
 
 ## When You're Done
 

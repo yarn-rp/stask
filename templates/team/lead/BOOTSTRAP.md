@@ -29,25 +29,30 @@ You need to understand the project before you can lead anyone.
 - `../shared/STACK.md` — full tech stack reference
 - `../shared/ARCHITECTURE.md` — data model, key patterns, access control flow, routing
 
-## Phase 3: Development Environment
+## Phase 3: Local Development Environment
 
-The team needs to run the project. Get this right.
+**This is your responsibility.** The entire team will depend on these docs to run the project. Get it right.
 
 ### Ask the human:
 
 1. "How do I run the project locally? Full setup sequence — prerequisites, install, start."
-2. "What environment variables are needed? Is there a .env.example?"
-3. "How do I run the database locally? (Supabase CLI? Docker? Remote?)"
+2. "What environment variables are needed? Is there a .env.example? Walk me through every required variable."
+3. "How do I run the database locally? (Supabase CLI? Docker? Remote? Connection string?)"
 4. "How do I seed or reset the database for testing?"
-5. "Are there test accounts? (login credentials, admin accounts, test credit cards)"
-6. "What's the deployment workflow? (Vercel auto-deploy? Staging? Manual?)"
-7. "How do database migrations get applied?"
-8. "Any gotchas? (migration order, env var quirks, rate limits, things that catch people)"
+5. "Are there test accounts? I need credentials for every role in the system:"
+   - Regular user (email + password)
+   - Admin account (if applicable)
+   - Seller/creator account (if applicable)
+   - Any other role-specific accounts
+6. "Are there test payment credentials? (Stripe test cards, sandbox keys)"
+7. "What's the deployment workflow? (Vercel auto-deploy? Staging? Manual?)"
+8. "How do database migrations get applied? Locally and in production."
+9. "Any gotchas? Things that break if you do them wrong? (migration order, env var quirks, rate limits, things that catch people)"
 
 ### Write what you learn:
 
-- `../shared/DEV.md` — local development runbook (setup, commands, verification steps)
-- `../shared/ENV.md` — environment variables (names, descriptions, where to get them)
+- `../shared/DEV.md` — full local development runbook. **This must be complete enough that any team member can follow it from scratch to running app without asking you a single question.**
+- `../shared/ENV.md` — every environment variable: name, description, where to get the value, whether it's public or secret
 - `../shared/GIT.md` — branch strategy, commit style, PR rules (confirm or adjust the template)
 
 ## Phase 4: Code Conventions & Ownership
@@ -95,15 +100,16 @@ Install valuable matches: `npx skills add <owner/repo@skill>`
 
 ## Phase 7: Team Readiness Check
 
-Before you're done, verify the shared files are complete enough for your team:
+Before you're done, verify the shared files are complete enough for your team. Every agent will read these on their first boot — if something's missing, they'll be stuck.
 
 - [ ] `../shared/PROJECT.md` — would a new team member understand what this is?
 - [ ] `../shared/STACK.md` — every technology documented?
 - [ ] `../shared/ARCHITECTURE.md` — data model, patterns, key flows?
-- [ ] `../shared/DEV.md` — could someone follow this to run the project from scratch?
-- [ ] `../shared/ENV.md` — all required variables listed?
+- [ ] `../shared/DEV.md` — could someone follow this to run the project from scratch? **Test it yourself.**
+- [ ] `../shared/ENV.md` — all required variables listed with descriptions?
 - [ ] `../shared/OWNERSHIP.md` — clear lines between backend and frontend?
 - [ ] `../shared/CONVENTIONS.md` — code style documented?
+- [ ] Test accounts documented in `../shared/DEV.md` — every role covered?
 
 If any file is incomplete, ask the human to fill the gaps before bootstrapping the team.
 

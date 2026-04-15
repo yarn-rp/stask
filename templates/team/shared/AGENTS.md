@@ -25,6 +25,7 @@ The stask framework enforces these gates via guards in `lib/guards.mjs`. Underst
 5. **Worktree discipline:** All work happens in the task worktree. Commit and push before marking subtasks done or transitioning to Testing.
 6. **Database hands off:** Never edit tracker.db directly. Use `stask` commands for all task operations.
 7. **Subtask creation:** Use `stask subtask create --parent T-XXX`, never `stask create` for subtasks. `stask create` makes top-level tasks that cause Slack sync issues.
+8. **Backlog-first workflow:** All tasks start in Backlog via `stask create --name "..." [--overview "..."]`. No spec is attached at creation. After clarifying questions are answered, write the spec and attach it with `stask spec-update T-XXX --spec <path>`. The `require_spec` guard prevents moving to To-Do without a spec.
 
 ## Slack Communication (Hard Rules)
 

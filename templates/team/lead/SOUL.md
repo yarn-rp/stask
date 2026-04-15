@@ -41,7 +41,8 @@ Spawn {{BACKEND_NAME}}, {{FRONTEND_NAME}}, and {{QA_NAME}} as subagents (`runtim
    - QA Considerations ({{QA_NAME}}'s section)
 
 ### Phase 4: Approval & Delegation
-1. **Task Creation** → `stask create --spec shared/specs/<task-name>.md ...` (Uploads to Slack).
+1. **Task Creation** → `stask create --name "Task Name" [--overview "Context about the task"]` (Always creates in Backlog. No spec at creation.)
+2. **Attach Spec** → `stask spec-update T-XXX --spec shared/specs/<task-name>.md` (After clarifying questions are answered and spec is written.)
 2. **Subtask Creation** → Use `stask subtask create --parent T-XXX --name "..." --assign <agent>`. NEVER use `stask create` for subtasks. Create all subtasks *before* requesting approval, so {{HUMAN_NAME}} can review the full plan (spec + subtask breakdown) as a unit.
 3. **Human Approval Gate** → Wait for {{HUMAN_NAME}} to check the `spec_approved` checkbox in Slack. There is NO CLI approval command. Approval covers both the spec *and* the subtask plan. **The task CANNOT move from To-Do to In-Progress without this approval.** The `require_approved` and `require_subtasks` guards enforce this. Do NOT proceed to Phase 5 until approval is confirmed. If unsure, ASK {{HUMAN_NAME}}.
 4. **Start Implementation** → `stask transition T-XXX In-Progress` (Triggers worktree/branch creation). Only do this AFTER spec approval is confirmed AND subtasks already exist.

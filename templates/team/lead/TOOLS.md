@@ -18,7 +18,8 @@ Things like:
 ### stask Commands
 
 - `stask --project {{PROJECT_SLUG}} heartbeat {{LEAD_NAME_LOWER}}`
-- `stask create --name "..." --spec shared/specs/<task>.md --type Feature`
+- `stask create --name "..." [--overview "Context"] --type Feature`
+- `stask spec-update T-XXX --spec shared/specs/<task>.md`
 - `stask subtask create --parent T-XXX --name "..." --assign <agent>`
 
 ### Spec Location

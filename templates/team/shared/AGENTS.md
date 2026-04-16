@@ -26,7 +26,8 @@ The stask framework enforces these gates via guards in `lib/guards.mjs`. Underst
 6. **Database hands off:** Never edit tracker.db directly. Use `stask` commands for all task operations.
 7. **Subtask creation:** Use `stask subtask create --parent T-XXX`, never `stask create` for subtasks. `stask create` makes top-level tasks that cause Slack sync issues.
 8. **Backlog-first workflow:** All tasks start in Backlog via `stask create --name "..." [--overview "..."]`. No spec is attached at creation. After clarifying questions are answered, write the spec and attach it with `stask spec-update T-XXX --spec <path>`. The `require_spec` guard prevents moving to To-Do without a spec.
-9. **QA test cleanup:** QA must delete any tasks created for testing purposes once testing is complete. Use `stask delete <task-id>`. No test artifacts should remain in the task board or Slack list after QA is done.
+9. **QA is a separate phase, NOT a subtask:** Subtasks are for development work only (worker implementation). QA happens AFTER all subtasks are done, via the Testing phase (phase gate). Do NOT create QA subtasks. The QA phase is triggered when workers mark subtasks done, and the `all_subtasks_done` guard enables the Testing transition.
+10. **QA test cleanup:** QA must delete any tasks created for testing purposes once testing is complete. Use `stask delete <task-id>`. No test artifacts should remain in the task board or Slack list after QA is done.
 
 ## Slack Communication (Hard Rules)
 

@@ -42,7 +42,7 @@ stask supports multiple projects. Each project lives in a repo with a `.stask/` 
 | **Human** | Approves specs (via `spec_approved` checkbox in Slack — the only approval path), reviews PRs on GitHub, merges |
 | **Lead** | Creates subtasks, delegates, coordinates fixes |
 | **Worker(s)** | Implements subtasks in worktrees (batched in a single session per parent), marks them done |
-| **QA** | Tests against acceptance criteria, submits pass/fail verdict |
+| **QA Engineer** | Tests against acceptance criteria, submits pass/fail verdict |
 
 ## Task Lifecycle
 
@@ -87,7 +87,7 @@ Guards run automatically before transitions. Checks run first (read-only); if al
 | To-Do (Human) | Spec attached, awaiting approval | Human |
 | To-Do (Lead) | Spec approved, Lead creating subtasks | Lead |
 | In-Progress | Workers building subtasks in worktree | Parent: Lead, Subtasks: Workers |
-| Testing | QA testing with evidence | QA |
+| Testing | QA Engineer testing with evidence | QA Engineer |
 | Ready for Human Review | QA PASSED, awaiting final sign-off + PR review | Human |
 | Done | PR merged, shipped | -- |
 | Blocked | Halted — escalated to Human | Human |
@@ -140,7 +140,7 @@ Every task has a dedicated Slack thread linked to its list item. The thread refe
 - **Subtask completion** — "Subtask T-XXX.1 done. Pushed 3 commits to feature/xxx"
 - **QA results** — "QA PASS: all 5 acceptance criteria verified. Screenshots attached."
 - **Status transitions** — "Transitioning T-XXX to Testing"
-- **Questions** — "Question for @yan: should the invite expire after 7 days or 30 days?"
+- **Questions** — "Question for @human: should the invite expire after 7 days or 30 days?"
 
 ### How to get the thread reference
 

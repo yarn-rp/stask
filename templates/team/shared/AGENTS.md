@@ -18,15 +18,16 @@ The stask framework enforces these gates via guards in `lib/guards.mjs`. Underst
 
 ## Hard Rules
 
-1. **Approval gate:** A task in To-Do assigned to {{HUMAN_NAME}} is NOT approved. Do not attempt to transition it to In-Progress. Wait for the `spec_approved` checkbox in Slack to trigger reassignment to the lead.
+1. **Approval gate:** A task in To-Do assigned to **Human** is NOT approved. Do not attempt to transition it to In-Progress. Wait for the `spec_approved` checkbox in Slack to trigger reassignment to the lead.
 2. **Subtask mandate:** Parent tasks must have all subtasks created and assigned BEFORE moving to In-Progress. No subtasks = no In-Progress transition.
-3. **Done is human-only:** Never run `stask transition <id> Done` on a parent task. Done happens when {{HUMAN_NAME}} merges the PR and marks it complete in Slack.
+3. **Done is human-only:** Never run `stask transition <id> Done` on a parent task. Done happens when **Human** merges the PR and marks it complete in Slack.
 4. **QA is mandatory:** Every task must pass through Testing. There are no shortcuts from In-Progress to Ready for Human Review.
 5. **Worktree discipline:** All work happens in the task worktree. Commit and push before marking subtasks done or transitioning to Testing.
 6. **Database hands off:** Never edit tracker.db directly. Use `stask` commands for all task operations.
 7. **Subtask creation:** Use `stask subtask create --parent T-XXX`, never `stask create` for subtasks. `stask create` makes top-level tasks that cause Slack sync issues.
 8. **Backlog-first workflow:** All tasks start in Backlog via `stask create --name "..." [--overview "..."]`. No spec is attached at creation. After clarifying questions are answered, write the spec and attach it with `stask spec-update T-XXX --spec <path>`. The `require_spec` guard prevents moving to To-Do without a spec.
-9. **QA test cleanup:** QA must delete any tasks created for testing purposes once testing is complete. Use `stask delete <task-id>`. No test artifacts should remain in the task board or Slack list after QA is done.
+9. **QA is a separate phase, NOT a subtask:** Subtasks are for development work only (worker implementation). QA happens AFTER all subtasks are done, via the Testing phase (phase gate). Do NOT create QA subtasks. The QA phase is triggered when workers mark subtasks done, and the `all_subtasks_done` guard enables the Testing transition.
+10. **QA test cleanup:** QA must delete any tasks created for testing purposes once testing is complete. Use `stask delete <task-id>`. No test artifacts should remain in the task board or Slack list after QA is done.
 
 ## Slack Communication (Hard Rules)
 

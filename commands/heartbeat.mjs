@@ -11,7 +11,9 @@ import path from 'path';
 import { execFileSync, execSync } from 'child_process';
 import { CONFIG, LIB_DIR, getWorkspaceLibs } from '../lib/env.mjs';
 import { withDb } from '../lib/tx.mjs';
-import { syncTaskToSlack, getThreadRef } from '../lib/slack-row.mjs';
+import { withTransaction } from '../lib/tx.mjs';
+import { syncTaskToSlack } from '../lib/slack-row.mjs';
+import { logError } from '../lib/error-logger.mjs';
 import { isTaskClaimable } from '../lib/session-tracker.mjs';
 import { getLeadAgent } from '../lib/roles.mjs';
 
@@ -441,11 +443,26 @@ IMPORTANT: Complete subtasks sequentially. Commit, push, and mark done after EAC
     const db = libs.trackerDb.getDb();
     for (const { task, prData } of prStatusQueue) {
       try {
-        await generateAndUploadPrStatus(task, prData, libs);
-        const updatedTask = libs.trackerDb.findTask(task['Task ID']);
-        await syncTaskToSlack(db, updatedTask);
+        await withTransaction(
+          (db, libs) => {
+            // The actual changes are handled by generateAndUploadPrStatus
+            const fileId = await generateAndUploadPrStatus(task, prData, libs);
+            return { fileId };
+          },
+          async ({ fileId }, db) => {
+            const updatedTask = libs.trackerDb.findTask(task['Task ID']);
+            const { slackOps } = await syncTaskToSlack(db, updatedTask);
+            return slackOps;
+          }
+        );
         console.error(`PR status report updated for ${task['Task ID']}`);
       } catch (err) {
+        logError({
+          source: 'heartbeat',
+          operation: 'pr_status_update',
+          taskId: task['Task ID'],
+          error: err
+        });
         console.error(`WARNING: PR status report failed for ${task['Task ID']}: ${err.message}`);
       }
     }

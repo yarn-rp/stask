@@ -12,6 +12,8 @@ import { CONFIG, getWorkspaceLibs } from '../lib/env.mjs';
 import { getSlackUserId } from '../lib/roles.mjs';
 import { syncTaskToSlack, getSlackRowId } from '../lib/slack-row.mjs';
 import { postThreadUpdate } from '../lib/thread-notify.mjs';
+import { withTransaction } from '../lib/tx.mjs';
+import { logError } from '../lib/error-logger.mjs';
 
 export async function run(argv) {
   const taskId = argv[0];
@@ -51,17 +53,35 @@ export async function run(argv) {
     return;
   }
 
-  // Update DB
-  libs.trackerDb.updateTaskDirect(taskId, { assigned_to: displayName });
-  libs.trackerDb.addLogEntry(taskId, `Reassigned: ${oldAssignee} → ${displayName}`);
+  let syncResult;
+  try {
+    const result = await withTransaction(
+      (db, libs) => {
+        libs.trackerDb.updateTaskDirect(taskId, { assigned_to: displayName });
+        libs.trackerDb.addLogEntry(taskId, `Reassigned: ${oldAssignee} → ${displayName}`);
 
-  // Push to Slack
-  const updatedTask = libs.trackerDb.findTask(taskId);
-  const parentId = updatedTask['Parent'];
-  const parentRowId = (parentId && parentId !== 'None') ? getSlackRowId(db, parentId) : null;
-  await syncTaskToSlack(db, updatedTask, parentRowId);
+        const updatedTask = libs.trackerDb.findTask(taskId);
+        const parentId = updatedTask['Parent'];
+        const parentRowId = (parentId && parentId !== 'None') ? getSlackRowId(db, parentId) : null;
+        return { task: updatedTask, parentRowId };
+      },
+      async ({ task, parentRowId }, db) => {
+        const { slackOps } = await syncTaskToSlack(db, task, parentRowId);
+        return slackOps;
+      }
+    );
+    syncResult = result;
+  } catch (err) {
+    logError({
+      source: 'assign',
+      operation: 'assign_and_sync',
+      taskId,
+      error: err
+    });
+    throw err;
+  }
 
   console.log(`${taskId}: ${oldAssignee} → ${displayName} (synced to Slack)`);
 
-  await postThreadUpdate(taskId, `*${taskId}* reassigned: *${oldAssignee}* → *${displayName}*`, db);
+  await postThreadUpdate(taskId, `*${taskId}* reassigned: *${oldAssignee}* → *${displayName}*`, db).catch(() => {});
 }

@@ -11,6 +11,7 @@
 import { CONFIG, getWorkspaceLibs } from '../lib/env.mjs';
 import { getSlackRowId } from '../lib/slack-row.mjs';
 import { TRIGGERS } from '../lib/tracker-db.mjs';
+import { logError } from '../lib/error-logger.mjs';
 
 export async function run(argv) {
   const taskId = argv[0];
@@ -48,6 +49,12 @@ export async function run(argv) {
         await libs.slackApi.deleteListRow(listId, rowId);
         slackDeleted++;
       } catch (err) {
+        logError({
+          source: 'delete',
+          operation: 'deleteSlackRow',
+          taskId: id,
+          error: err
+        });
         console.error(`WARNING: Could not delete Slack row for ${id}: ${err.message}`);
       }
     }

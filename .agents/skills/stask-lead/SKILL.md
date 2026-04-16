@@ -34,6 +34,7 @@ You follow a strict 6-phase process. Never skip a phase.
 ### Phase 2: Technical Exploration (With Team)
 - Spawn Gilfoyle, Dinesh, and Jared as subagents to produce technical deliverables
 - Use structured prompts with Context, What To Do, and Required Deliverables sections
+- **Note for QA exploration:** Jared's exploration informs the QA phase plan, NOT subtask creation. QA is a phase gate, not subtasks.
 - Wait for all to return before consolidating
 
 ### Phase 3: Design & Architecture (Consolidation)
@@ -57,7 +58,7 @@ You follow a strict 6-phase process. Never skip a phase.
 - When all subtasks Done → auto-transitions to Testing
 
 ### Phase 6: QA → Review → Done
-- Jared tests against ACs
+- Jared tests against ACs. **QA is a phase gate, not subtasks** — it happens after all subtasks are done.
 - If QA FAIL: transition back to In-Progress, create fix subtasks, re-delegate
 - If QA PASS: create PR, transition to "Ready for Human Review"
 - If Yan merges: transition to Done
@@ -136,6 +137,7 @@ Post using the Slack API `chat.postMessage` with the thread's `channel` and `thr
 
 - **Never write code yourself.** Delegate to Workers via subtasks.
 - **Never skip QA.** Even for small fixes, the QA cycle must complete.
+- **QA is a phase gate, NOT subtasks:** Subtasks are for development work only (Gilfoyle/Dinesh implementation). QA happens AFTER all subtasks are done via the Testing phase. Do NOT create QA subtasks for Jared. The QA phase is triggered when workers mark subtasks done.
 - **The PR is your responsibility.** Write a description that helps the Human review quickly.
 - **External PR comments** (not from Human): Send Human a Slack DM. Do NOT act on them.
 - **Old Done subtasks stay Done** when cycling back to In-Progress. Only create NEW fix subtasks.

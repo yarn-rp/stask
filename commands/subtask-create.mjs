@@ -53,23 +53,13 @@ export async function run(argv) {
       return { subtaskId, taskRow, parentSpec };
     },
     async ({ taskRow, subtaskId }, db) => {
-      try {
-        const { slackOps } = await syncSubtaskToSlack(db, taskRow);
-        return slackOps;
-      } catch (err) {
-        // Slack subtask linking can fail (parent_item_id not respected by API).
-        // Don't roll back the DB — commit the subtask and let the sync daemon
-        // retry the Slack push on its next cycle.
-        console.error(`WARNING: Slack sync failed for subtask ${subtaskId}: ${err.message}`);
-        console.error(`Subtask saved to DB. Sync daemon will retry.`);
-        return []; // return empty ops so transaction commits
-      }
+      const { slackOps } = await syncSubtaskToSlack(db, taskRow);
+      return slackOps;
     }
   );
 
   const specFileId = result.parentSpec.match(/\((\w+)\)$/)?.[1] || result.parentSpec;
-  const slackWarning = ' (Slack sync pending — daemon will retry)';
-  console.log(`Created ${result.subtaskId}: "${args.name}" | Parent: ${args.parent} | Assigned: ${args.assign} | Spec: ${specFileId}${slackWarning}`);
+  console.log(`Created ${result.subtaskId}: "${args.name}" | Parent: ${args.parent} | Assigned: ${args.assign} | Spec: ${specFileId}`);
 
   await postThreadUpdate(args.parent, `Subtask created: *${result.subtaskId}* "${args.name}" | Assigned to *${args.assign}*`);
 }

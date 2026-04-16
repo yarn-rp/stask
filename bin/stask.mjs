@@ -156,7 +156,7 @@ function printHelp() {
 Usage: stask <command> [args...]
 
 Mutation commands (DB + Slack transaction):
-  inbox <list|show|subscribe|unsubscribe|subs>  Manage inbox subscriptions and items
+  inbox <list|show|subscribe|unsubscribe|subs|poll>  Manage inbox subscriptions and items
   create --name "..." [--spec <path>] [--type Feature|Bug|Task]
   transition <task-id> <status>
   subtask create --parent <id> --name "..." --assign <agent>

@@ -7,10 +7,12 @@
  *   stask inbox subscribe <source> <target> [--interval seconds]
  *   stask inbox unsubscribe <sub-id>
  *   stask inbox subs list
+ *   stask inbox poll
  */
 
 import { withDb } from '../lib/tx.mjs';
 import { execFileSync } from 'child_process';
+import { run as runPollerd } from '../lib/inbox/pollerd.mjs';
 
 // ─── Argument parsing ──────────────────────────────────────────────
 
@@ -28,7 +30,7 @@ function parseArgs(argv) {
     // Args: <source> <target> [--interval N] [--filter JSON]
     args.source = raw[0]; // 'github' or 'linear'
     args.target = raw[1]; // repo slug or project key
-    args.interval = 300; // default
+    args.interval = null; // null = use source-specific default
     for (let i = 2; i < raw.length; i++) {
       if (raw[i] === '--interval' && raw[i + 1]) args.interval = parseInt(raw[++i], 10);
       if (raw[i] === '--filter' && raw[i + 1]) args.filter = raw[++i];
@@ -195,7 +197,7 @@ async function cmdSubscribe(args) {
   // Validate connectivity before subscribing
   if (sourceType === 'github') {
     try {
-      execFileSync('gh', ['api', 'repos', args.target, '--jq', '.full_name'], {
+      execFileSync('gh', ['api', 'repos/' + args.target, '--jq', '.full_name'], {
         encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'],
       });
     } catch {
@@ -269,14 +271,15 @@ async function cmdSubscribe(args) {
     const subId = `SUB-${Date.now().toString(36).toUpperCase()}`;
     const pollInterval = sourceType === 'linear' ? 900 : 300; // Linear=15min, GitHub=5min
 
+    const resolvedInterval = args.interval ?? pollInterval;
     db.prepare(`
       INSERT INTO inbox_subs (sub_id, source_type, target_id, filters, poll_interval, active)
       VALUES (?, ?, ?, ?, ?, 1)
-    `).run(subId, sourceType, args.target, args.filter || null, args.interval || pollInterval);
+    `).run(subId, sourceType, args.target, args.filter || null, resolvedInterval);
 
     console.log(`Subscribed to ${sourceType}: ${args.target}`);
     console.log(`  Sub ID:    ${subId}`);
-    console.log(`  Interval:  ${args.interval || pollInterval}s`);
+    console.log(`  Interval:  ${resolvedInterval}s`);
   });
 }
 
@@ -386,9 +389,12 @@ export async function run(argv) {
     case 'subs':
       await cmdSubsList(args);
       break;
+    case 'poll':
+      await runPollerd([]);
+      break;
     default:
       console.error(`Unknown subcommand: ${args.subcommand}`);
-      console.error('Usage: stask inbox <list|show|subscribe|unsubscribe|subs>');
+      console.error('Usage: stask inbox <list|show|subscribe|unsubscribe|subs|poll>');
       process.exit(1);
   }
 }

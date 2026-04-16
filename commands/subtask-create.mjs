@@ -53,12 +53,8 @@ export async function run(argv) {
       return { subtaskId, taskRow, parentSpec };
     },
     async ({ taskRow, subtaskId }, db) => {
-      try {
-        const { slackOps } = await syncSubtaskToSlack(db, taskRow);
-        return slackOps;
-      } catch (err) {
-        throw new Error(`Slack sync failed for subtask ${subtaskId} (parent: ${args.parent}, name: "${args.name}"): ${err.message}`);
-      }
+      const { slackOps } = await syncSubtaskToSlack(db, taskRow);
+      return slackOps;
     }
   );
 

@@ -18,9 +18,9 @@ The stask framework enforces these gates via guards in `lib/guards.mjs`. Underst
 
 ## Hard Rules
 
-1. **Approval gate:** A task in To-Do assigned to {{HUMAN_NAME}} is NOT approved. Do not attempt to transition it to In-Progress. Wait for the `spec_approved` checkbox in Slack to trigger reassignment to the lead.
+1. **Approval gate:** A task in To-Do assigned to **Human** is NOT approved. Do not attempt to transition it to In-Progress. Wait for the `spec_approved` checkbox in Slack to trigger reassignment to the lead.
 2. **Subtask mandate:** Parent tasks must have all subtasks created and assigned BEFORE moving to In-Progress. No subtasks = no In-Progress transition.
-3. **Done is human-only:** Never run `stask transition <id> Done` on a parent task. Done happens when {{HUMAN_NAME}} merges the PR and marks it complete in Slack.
+3. **Done is human-only:** Never run `stask transition <id> Done` on a parent task. Done happens when **Human** merges the PR and marks it complete in Slack.
 4. **QA is mandatory:** Every task must pass through Testing. There are no shortcuts from In-Progress to Ready for Human Review.
 5. **Worktree discipline:** All work happens in the task worktree. Commit and push before marking subtasks done or transitioning to Testing.
 6. **Database hands off:** Never edit tracker.db directly. Use `stask` commands for all task operations.

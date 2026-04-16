@@ -28,7 +28,7 @@ import { loadManifests, getRoles, getLeadRole, generateSlackManifest } from '../
 // Shared step functions — used by both full wizard and --only partial mode
 import {
   stepChannel, stepList, stepCanvas, stepBookmarks, stepWelcome,
-  stepSkills, stepCron, stepOpenclaw, stepVerify,
+  stepSkills, stepCron, stepOpenclaw, stepVerify, stepInbox,
   buildContext, getWorkspaceInfo,
 } from '../lib/setup/steps.mjs';
 
@@ -363,6 +363,23 @@ export async function run(args) {
     completeStep(state, 'slackSetup');
   }
 
+  // ═══ PHASE 5.5 — Inbox Setup (GitHub/Linear polling) ═══
+  if (!isStepDone(state, 'inbox')) {
+    phase(5.5);
+    log.info(pc.dim('Setting up inbox subscriptions for GitHub/Linear event polling.\n'));
+
+    const inboxCtx = buildContext({
+      staskConfig: { agents: staskAgents, human: { slackUserId: d.humanSlackUserId }, slack: { listId: d.slackListId } },
+      slug: d.projectSlug, repoPath: d.repoPath, leadToken: d.slackAccounts[d.agents[LEAD_ROLE.id].name]?.botToken,
+    });
+    inboxCtx.canvasId = d.canvasId;
+
+    await stepInbox(s, inboxCtx);
+
+    saveSetupState(state.projectSlug, state);
+    completeStep(state, 'inbox');
+  }
+
   // ═══ PHASE 6 — Register Everything ═══
   if (!isStepDone(state, 'register')) {
     phase(6);
@@ -536,6 +553,15 @@ async function runPartial({ onlySteps, detectedRepoPath }) {
   log.info(`Project: ${pc.bold(slug)}  Lead: ${pc.bold(leadName)}`);
   log.info(`Steps: ${pc.cyan([...onlySteps].join(', '))}\n`);
 
+  // Validate onlySteps - add 'inbox' to valid steps
+  const validSteps = ['channel', 'list', 'canvas', 'bookmark', 'welcome', 'skills', 'cron', 'openclaw', 'verify', 'inbox'];
+  const invalidSteps = [...onlySteps].filter(s => !validSteps.includes(s));
+  if (invalidSteps.length > 0) {
+    log.error(`Invalid step(s): ${invalidSteps.join(', ')}`);
+    log.info(`Valid steps: ${validSteps.join(', ')}`);
+    process.exit(1);
+  }
+
   // Run requested steps — same functions as full wizard
   if (onlySteps.has('channel'))  await stepChannel(s, ctx);
   if (onlySteps.has('list'))     await stepList(s, ctx);
@@ -551,6 +577,7 @@ async function runPartial({ onlySteps, detectedRepoPath }) {
   if (onlySteps.has('cron'))     await stepCron(s, ctx, AGENT_MANIFESTS);
   if (onlySteps.has('openclaw')) await stepOpenclaw(s, ctx, null, TEAM_MANIFEST);
   if (onlySteps.has('verify'))   stepVerify(ctx);
+  if (onlySteps.has('inbox'))    await stepInbox(s, ctx);
 
   outro(pc.green('Done'));
 }

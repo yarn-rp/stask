@@ -2,7 +2,7 @@
  * stask setup — Interactive wizard to bootstrap a complete engineering team project.
  *
  * Usage: stask setup [path]
- *        stask setup [path] --only channel,list,canvas,bookmark,welcome,skills,cron,openclaw,verify
+ *        stask setup [path] --only channel,list,canvas,bookmark,welcome,skills,cron,openclaw,verify,inbox
  */
 
 import fs from 'node:fs';
@@ -363,16 +363,23 @@ export async function run(args) {
     completeStep(state, 'slackSetup');
   }
 
-  // ═══ PHASE 5.5 — Inbox Setup (GitHub/Linear polling) ═══
+  // ═══ PHASE 6 — Inbox Setup (GitHub/Linear polling) ═══
   if (!isStepDone(state, 'inbox')) {
-    phase(5.5);
+    phase(6);
     log.info(pc.dim('Setting up inbox subscriptions for GitHub/Linear event polling.\n'));
 
+    // Build staskAgents independently (may not be in scope if slackSetup was already done)
+    const inboxAgents = {};
+    for (const role of ROLES) {
+      const name = d.agents[role.id].name;
+      const staskRole = role.id === 'lead' ? 'lead' : role.id === 'qa' ? 'qa' : 'worker';
+      inboxAgents[name] = { role: staskRole, slackUserId: d.slackAccounts[name]?.userId };
+    }
+
     const inboxCtx = buildContext({
-      staskConfig: { agents: staskAgents, human: { slackUserId: d.humanSlackUserId }, slack: { listId: d.slackListId } },
+      staskConfig: { agents: inboxAgents, human: { slackUserId: d.humanSlackUserId }, slack: { listId: d.slackListId } },
       slug: d.projectSlug, repoPath: d.repoPath, leadToken: d.slackAccounts[d.agents[LEAD_ROLE.id].name]?.botToken,
     });
-    inboxCtx.canvasId = d.canvasId;
 
     await stepInbox(s, inboxCtx);
 
@@ -380,9 +387,9 @@ export async function run(args) {
     completeStep(state, 'inbox');
   }
 
-  // ═══ PHASE 6 — Register Everything ═══
+  // ═══ PHASE 7 — Register Everything ═══
   if (!isStepDone(state, 'register')) {
-    phase(6);
+    phase(7);
     log.info(pc.dim('Registering agents, setting up cron jobs, and initializing the project.\n'));
 
     const workspaceBase = path.join(OPENCLAW_HOME, `workspace-${d.projectSlug}`);

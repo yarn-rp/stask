@@ -1,33 +1,19 @@
 /**
- * stask pr-status — Query PR status (comments, merge state) from GitHub.
+ * ⚠️ DEPRECATED — This command has been superseded by the Inbox Subscription Engine.
  *
- * Usage: stask pr-status <task-id>
+ * PR status detection is now handled by:
+ *   - lib/inbox/sources/github.mjs (fetches PR merge state and comments)
+ *   - lib/inbox/actions.mjs (executes automated transitions)
+ *   - lib/inbox/pollerd.mjs (daemon entry point, runs on cron)
+ *
+ * View PR-related inbox items:  stask inbox list --source github
+ * View specific item:           stask inbox show <item-id>
+ *
+ * This file is preserved for reference only. Do not use.
+ * Removal scheduled: v0.3.0
  */
 
-import path from 'path';
-import { execFileSync } from 'child_process';
-import { CONFIG, LIB_DIR, getWorkspaceLibs } from '../lib/env.mjs';
-
 export async function run(argv) {
-  const taskId = argv[0];
-
-  if (!taskId) {
-    console.error('Usage: stask pr-status <task-id>');
-    process.exit(1);
-  }
-
-  const libs = await getWorkspaceLibs();
-  const task = libs.trackerDb.findTask(taskId);
-  if (!task) { console.error(`ERROR: Task ${taskId} not found`); process.exit(1); }
-  if (task['PR'] === 'None') { console.error(`ERROR: Task ${taskId} has no PR`); process.exit(1); }
-
-  try {
-    const result = execFileSync(process.execPath, [path.join(LIB_DIR, 'pr-status.mjs'), taskId], {
-      encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'],
-    });
-    console.log(result.trim());
-  } catch (err) {
-    console.error(`ERROR: ${err.stderr || err.message}`);
-    process.exit(1);
-  }
+  console.error('⚠️ stask pr-status is DEPRECATED. Use: stask inbox list --source github');
+  process.exit(1);
 }

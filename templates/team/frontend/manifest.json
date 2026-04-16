@@ -26,7 +26,7 @@
   },
 
   "cron": {
-    "heartbeat": "10,30,50 * * * *"
+    "heartbeat": "5,25,45 * * * *"
   },
 
   "subagents": "lead-only",

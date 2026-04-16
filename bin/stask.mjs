@@ -78,6 +78,7 @@ if (_cmd && _cmd !== 'sync-daemon' && _cmd !== '--help' && _cmd !== '-h'
 // ─── Subcommand dispatch ───────────────────────────────────────────
 
 const COMMANDS = {
+  'inbox':          () => import('../commands/inbox.mjs'),
   'create':         () => import('../commands/create.mjs'),
   'transition':     () => import('../commands/transition.mjs'),
   'subtask':        null, // nested — handled below
@@ -155,6 +156,7 @@ function printHelp() {
 Usage: stask <command> [args...]
 
 Mutation commands (DB + Slack transaction):
+  inbox <list|show|subscribe|unsubscribe|subs>  Manage inbox subscriptions and items
   create --name "..." [--spec <path>] [--type Feature|Bug|Task]
   transition <task-id> <status>
   subtask create --parent <id> --name "..." --assign <agent>

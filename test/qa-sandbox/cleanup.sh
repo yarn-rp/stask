@@ -1,18 +1,21 @@
 #!/usr/bin/env bash
 # cleanup.sh — tear down Slack artifacts the QA sandbox installed.
 #
-# Finds the `{slug}-project` channel in the workspace, deletes every canvas
-# tab attached to it, and clears the bookmarks. Does NOT archive the
-# channel — once archived, the bot gets kicked out and Slack's API won't
-# let it unarchive itself (only an admin can, via the UI). Leaving the
-# channel active lets `stask setup` reuse it cleanly on the next install.
+# Deletes:
+#   - The Slack List recorded in seed/dummy-repo/.stask/config.json (via files.delete)
+#   - Every canvas tab attached to the sandbox's project channel
+# Does NOT archive the channel by default — once archived, the bot gets
+# kicked out and Slack's API won't let it unarchive itself (only a
+# workspace admin can, via the UI). Leaving the channel active lets
+# `stask setup` / bootstrap-channel.mjs reuse it on the next install,
+# which is why we don't keep accumulating archived channels forever.
 #
 # Uses the Lead agent's bot token from ~/.stask-qa/credentials.json, so it
 # operates on whichever workspace those tokens belong to. If you're about
 # to switch workspaces, run cleanup BEFORE editing credentials.
 #
 # Usage:
-#   bash test/qa-sandbox/cleanup.sh               # delete canvases + bookmarks
+#   bash test/qa-sandbox/cleanup.sh               # delete list + canvases
 #   bash test/qa-sandbox/cleanup.sh --wipe-seed   # also delete local seed/ + SEED_VERSION
 #   bash test/qa-sandbox/cleanup.sh --dry-run     # preview without calling destructive APIs
 #   bash test/qa-sandbox/cleanup.sh --archive     # also archive the channel (admin UI needed to undo)
@@ -126,6 +129,22 @@ if [ -n "$CHAN_ID" ]; then
   fi
 fi
 
+# ── 2b. Locate the Slack List recorded in the seed ──────────────
+# Slack Lists are exposed via the files API (filetype=list). `files.delete`
+# removes them entirely — no separate slackLists.delete method exists.
+LIST_ID=""
+SEED_CONFIG="$SANDBOX_DIR/seed/dummy-repo/.stask/config.json"
+if [ -f "$SEED_CONFIG" ]; then
+  LIST_ID=$(node -e "
+    try { const c = require('$SEED_CONFIG'); const id = c.slack?.listId; process.stdout.write(id && id !== 'YOUR_SLACK_LIST_ID' ? id : ''); } catch { }
+  ")
+fi
+if [ -n "$LIST_ID" ]; then
+  step "Seeded list: $LIST_ID"
+else
+  dim "  no list recorded in seed (or placeholder value)"
+fi
+
 # ── 3. Act ──────────────────────────────────────────────────────
 if [ "$DRY" = "1" ]; then
   echo
@@ -147,6 +166,12 @@ else
       RES=$(api 'canvases.delete' "{\"canvas_id\":\"$CID\"}" | api_result)
       if [ "$RES" = "ok" ]; then green "  ✓ deleted"; else red "  FAILED: $RES"; fi
     done
+  fi
+
+  if [ -n "$LIST_ID" ]; then
+    step "Deleting list $LIST_ID"
+    RES=$(api 'files.delete' "{\"file\":\"$LIST_ID\"}" | api_result)
+    if [ "$RES" = "ok" ]; then green "  ✓ deleted"; else red "  FAILED: $RES"; fi
   fi
 
   if [ -n "$CHAN_ID" ]; then

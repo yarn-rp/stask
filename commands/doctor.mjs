@@ -32,7 +32,7 @@ const EXPECTED = {
   announceTimeoutMs: 600_000,
   runTimeoutSeconds: 1800,
   subagentsMaxConcurrent: 8,
-  leadMaxConcurrent: 8,
+  maxConcurrent: 8,
   gatewayBind: 'lan',
 };
 
@@ -95,18 +95,18 @@ export async function run(args) {
       ok(`gateway.bind = "${bind}"`);
     }
 
-    // ── 4. Lead concurrency override ────────────────────────────
+    // ── 4. Default agent concurrency ────────────────────────────
+    // This is the lever that absorbs worker-announce fan-in on the lead.
+    // Per-agent maxConcurrent isn't in the OpenClaw schema.
+    const defaults = configGet('agents.defaults') || {};
     const list = configGet('agents.list') || [];
-    const leads = list.filter((a) => Array.isArray(a.subagents?.allowAgents) && a.subagents.allowAgents.length > 1);
-    for (const lead of leads) {
-      if ((lead.maxConcurrent ?? 0) < EXPECTED.leadMaxConcurrent) {
-        warn(
-          `Lead agent "${lead.id}" has maxConcurrent = ${lead.maxConcurrent ?? 'default (4)'}; bump to ${EXPECTED.leadMaxConcurrent} to absorb simultaneous worker announces`,
-          `openclaw config set 'agents.list[?(@.id=="${lead.id}")].maxConcurrent' ${EXPECTED.leadMaxConcurrent}`,
-        );
-      } else {
-        ok(`Lead "${lead.id}" maxConcurrent = ${lead.maxConcurrent}`);
-      }
+    if ((defaults.maxConcurrent ?? 0) < EXPECTED.maxConcurrent) {
+      warn(
+        `agents.defaults.maxConcurrent = ${defaults.maxConcurrent ?? 'unset (default 3)'}; recommend ${EXPECTED.maxConcurrent} so leads absorb simultaneous worker announces`,
+        `openclaw config set agents.defaults.maxConcurrent ${EXPECTED.maxConcurrent}`,
+      );
+    } else {
+      ok(`agents.defaults.maxConcurrent = ${defaults.maxConcurrent}`);
     }
 
     // ── 5. Cron jobs per agent ──────────────────────────────────

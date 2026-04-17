@@ -11,7 +11,12 @@
     "heartbeat": { "every": "10m" },
     "compaction": { "mode": "safeguard" },
     "maxConcurrent": 4,
-    "subagents": { "maxConcurrent": 8 },
+    "subagents": {
+      "maxConcurrent": 8,
+      "announceTimeoutMs": 600000,
+      "runTimeoutSeconds": 1800
+    },
+    "leadMaxConcurrent": 8,
     "memorySearch": { "provider": "ollama" }
   },
 

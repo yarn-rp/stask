@@ -20,6 +20,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { loadProjectsRegistry, saveProjectsRegistry, GLOBAL_STASK_DIR } from '../lib/resolve-home.mjs';
+import { configGet, configSetBatch, cronRemove, agentsDelete } from '../lib/setup/openclaw-cli.mjs';
 
 const OPENCLAW_HOME = path.join(process.env.HOME || '', '.openclaw');
 
@@ -46,23 +47,15 @@ export async function run(args) {
   const workspaceDir = path.join(OPENCLAW_HOME, `workspace-${slug}`);
   const stateFile = path.join(GLOBAL_STASK_DIR, `setup-state-${slug}.json`);
 
-  // Discover agent names from the workspace directory or openclaw.json
+  // Discover agent names via the openclaw CLI (gateway-safe).
   let agentIds = [];
+  const agentsList = configGet('agents.list') || [];
+  agentIds = agentsList
+    .filter((a) => a.workspace && a.workspace.includes(`workspace-${slug}/`))
+    .map((a) => a.id);
 
-  // Try from openclaw.json
-  const configPath = path.join(OPENCLAW_HOME, 'openclaw.json');
-  let ocConfig = null;
-  if (fs.existsSync(configPath)) {
-    try {
-      ocConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-      // Find agents whose workspace is under this project's workspace
-      agentIds = (ocConfig.agents?.list || [])
-        .filter((a) => a.workspace && a.workspace.includes(`workspace-${slug}/`))
-        .map((a) => a.id);
-    } catch {}
-  }
-
-  // Fallback: list directories in the workspace
+  // Fallback: list directories in the workspace (covers the case where the
+  // gateway isn't reachable or the config was hand-edited).
   if (agentIds.length === 0 && fs.existsSync(workspaceDir)) {
     try {
       agentIds = fs.readdirSync(workspaceDir, { withFileTypes: true })
@@ -92,63 +85,67 @@ export async function run(args) {
     process.exit(0);
   }
 
-  // ── 1. Remove agents from openclaw.json ──────────────────────
+  // ── 1. Remove agents from openclaw.json via the CLI ──────────
+  //
+  // Hub-and-spoke note: agent entries, Slack accounts, and bindings all live
+  // in openclaw.json. We build one batch that removes every project-owned
+  // entry in a single dry-run-validated commit.
 
-  if (ocConfig) {
+  if (agentIds.length > 0) {
     const idSet = new Set(agentIds);
-    let changed = false;
 
-    // Remove from agents.list
-    if (ocConfig.agents?.list) {
-      const before = ocConfig.agents.list.length;
-      ocConfig.agents.list = ocConfig.agents.list.filter((a) => !idSet.has(a.id));
-      if (ocConfig.agents.list.length < before) changed = true;
+    // agents.list — filter out project-owned entries
+    const listBefore = configGet('agents.list') || [];
+    const listAfter = listBefore.filter((a) => !idSet.has(a.id));
+
+    // bindings — same filter, by agentId
+    const bindingsBefore = configGet('bindings') || [];
+    const bindingsAfter = bindingsBefore.filter((b) => !idSet.has(b.agentId));
+
+    const ops = [];
+    if (listAfter.length !== listBefore.length) {
+      ops.push({ path: 'agents.list', value: listAfter });
     }
-
-    // Remove Slack accounts
-    if (ocConfig.channels?.slack?.accounts) {
-      for (const id of agentIds) {
-        if (ocConfig.channels.slack.accounts[id]) {
-          delete ocConfig.channels.slack.accounts[id];
-          changed = true;
-        }
+    if (bindingsAfter.length !== bindingsBefore.length) {
+      ops.push({ path: 'bindings', value: bindingsAfter });
+    }
+    // channels.slack.accounts: we set each removed id to null so the batch
+    // applier unsets it. (OpenClaw's set batch treats null as unset for
+    // map-typed paths; objects with known scalar keys round-trip fine.)
+    const existingAccounts = configGet('channels.slack.accounts') || {};
+    for (const id of agentIds) {
+      if (existingAccounts[id] !== undefined) {
+        ops.push({ path: `channels.slack.accounts.${id}`, value: null });
       }
     }
 
-    // Remove bindings
-    if (ocConfig.bindings) {
-      const before = ocConfig.bindings.length;
-      ocConfig.bindings = ocConfig.bindings.filter((b) => !idSet.has(b.agentId));
-      if (ocConfig.bindings.length < before) changed = true;
+    if (ops.length > 0) {
+      try {
+        configSetBatch(ops);
+        console.log(`  ✓ Removed ${agentIds.length} agents from openclaw.json`);
+      } catch (err) {
+        // Don't abort teardown on a single write failure — surface and move on.
+        console.log(`  ⚠ openclaw.json cleanup failed: ${err.message}`);
+      }
     }
 
-    if (changed) {
-      fs.writeFileSync(configPath, JSON.stringify(ocConfig, null, 2) + '\n');
-      console.log(`  ✓ Removed ${agentIds.length} agents from openclaw.json`);
-    }
+    // Also call `openclaw agents delete` — it does additional cleanup
+    // (session state, identity records) beyond what the batch above covers.
+    for (const id of agentIds) agentsDelete(id);
   }
 
-  // ── 2. Remove heartbeat cron jobs ────────────────────────────
-
-  const cronPath = path.join(OPENCLAW_HOME, 'cron', 'jobs.json');
-  if (fs.existsSync(cronPath)) {
-    try {
-      const cron = JSON.parse(fs.readFileSync(cronPath, 'utf-8'));
-      let removed = 0;
-      if (cron.jobs) {
-        for (const id of agentIds) {
-          const key = `${id}-heartbeat`;
-          if (cron.jobs[key]) {
-            delete cron.jobs[key];
-            removed++;
-          }
-        }
-      }
-      if (removed) {
-        fs.writeFileSync(cronPath, JSON.stringify(cron, null, 2) + '\n');
-        console.log(`  ✓ Removed ${removed} heartbeat cron jobs`);
-      }
-    } catch {}
+  // ── 2. Remove heartbeat cron jobs via the CLI ────────────────
+  //
+  // The old direct-file code assumed cron.jobs was an object; the setup code
+  // writes it as an array. That mismatch silently did nothing. Using
+  // `openclaw cron rm` via cronRemove() works with either storage layout and
+  // also tells the live scheduler to unschedule.
+  {
+    let removed = 0;
+    for (const id of agentIds) {
+      if (cronRemove(`${id}-heartbeat`)) removed++;
+    }
+    if (removed > 0) console.log(`  ✓ Removed ${removed} heartbeat cron jobs`);
   }
 
   // ── 3. Remove agent directories ──────────────────────────────

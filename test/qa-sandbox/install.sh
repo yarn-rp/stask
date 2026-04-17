@@ -101,6 +101,32 @@ node "$SANDBOX_DIR/fixtures/render-answers.mjs" \
   "$GH_NAME" \
   > "$ANSWERS"
 
+# ── 5b. Provision the project Slack channel out-of-band ─────────
+# stask setup's create-channel step has no automatic recovery if the
+# canonical `{slug}-project` name is locked by an archived channel (the
+# bot can't unarchive itself once kicked). Pre-provisioning here picks
+# the first available `{slug}-project[-N]` name, then we tell the
+# wizard "use this existing channel" so stepChannel is skipped.
+step "Provisioning Slack channel"
+SLUG=$(node -e "console.log(require('$SANDBOX_DIR/fixtures/setup-answers.template.json')['Project name'])")
+CHANNEL_ID=$(node "$SANDBOX_DIR/fixtures/bootstrap-channel.mjs" "$CREDS" "$SLUG")
+if [ -z "$CHANNEL_ID" ]; then
+  red "channel bootstrap failed — scratch kept at $SCRATCH"
+  trap - EXIT
+  exit 1
+fi
+green "  using $CHANNEL_ID"
+
+# Patch the answers so setup takes the `existing` branch.
+node - "$ANSWERS" "$CHANNEL_ID" <<'NODE_EOF'
+const fs = require('node:fs');
+const [, , file, channelId] = process.argv;
+const a = JSON.parse(fs.readFileSync(file, 'utf-8'));
+a['Project Slack channel'] = 'existing';
+a['Channel ID'] = channelId;
+fs.writeFileSync(file, JSON.stringify(a, null, 2));
+NODE_EOF
+
 # ── 6. Run stask setup non-interactively ────────────────────────
 step "Running stask setup (creates channel/list/canvas in your dummy Slack)"
 export STASK_SETUP_ANSWERS="$ANSWERS"

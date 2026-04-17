@@ -543,13 +543,17 @@ async function runPartial({ onlySteps, detectedRepoPath }) {
   const staskConfig = JSON.parse(fs.readFileSync(staskConfigPath, 'utf-8'));
   const slug = staskConfig.project;
 
-  // Find lead token from openclaw.json
+  // Find lead token from openclaw.json (optional for some steps like inbox)
   const ocPath = path.join(OPENCLAW_HOME, 'openclaw.json');
   const oc = fs.existsSync(ocPath) ? JSON.parse(fs.readFileSync(ocPath, 'utf-8')) : {};
   const leadName = Object.entries(staskConfig.agents || {}).find(([, v]) => v.role === 'lead')?.[0];
-  const leadToken = oc.channels?.slack?.accounts?.[leadName]?.botToken;
+  const leadToken = oc.channels?.slack?.accounts?.[leadName]?.botToken || '';
 
-  if (!leadToken) {
+  // Steps that require a Slack lead token
+  const SLACK_STEPS = new Set(['channel', 'list', 'canvas', 'bookmark', 'welcome', 'verify']);
+  const needsSlackToken = [...onlySteps].some(s => SLACK_STEPS.has(s));
+
+  if (!leadToken && needsSlackToken) {
     log.error('Could not find lead agent token. Ensure Slack apps are configured.');
     process.exit(1);
   }

@@ -45,9 +45,18 @@ fi
 # ── Remember real HOME for cleanup/debugging ─────────────────────
 export STASK_QA_SANDBOX_REAL_HOME="$HOME"
 
+# ── Export gh auth token so gh works after HOME swap ─────────────
+# `gh` stores auth under $HOME/.config/gh, which won't exist in the scratch
+# HOME. Grabbing the token now and exporting $GH_TOKEN lets gh run normally.
+if command -v gh >/dev/null && gh auth status >/dev/null 2>&1; then
+  export GH_TOKEN=$(gh auth token 2>/dev/null)
+fi
+
 # ── Create ephemeral HOME ────────────────────────────────────────
+# Deliberately do NOT export STASK_HOME — despite the name, it points at the
+# *project*'s .stask/ (per lib/resolve-home.mjs:121), not the home-central one.
+# Setting it would break auto-resolution when cwd is inside $HOME/dummy-repo.
 export HOME=$(mktemp -d /tmp/stask-qa.XXXXXX)
-export STASK_HOME="$HOME/.stask"
 export STASK_QA_SANDBOX=1
 
 if [ "$_EMPTY" = "1" ]; then
@@ -62,6 +71,13 @@ else
   printf '  %s\n' "cd \$HOME/dummy-repo && stask list"
 fi
 
+# ── Wire gh as a git credential helper ───────────────────────────
+# Lets `git push` inside the sandbox authenticate via $GH_TOKEN without
+# prompting for a password. Writes to $HOME/.gitconfig which is ephemeral.
+if [ -n "${GH_TOKEN:-}" ]; then
+  gh auth setup-git >/dev/null 2>&1 || true
+fi
+
 # ── Cleanup trap — runs when the shell exits ────────────────────
 # Keep the user's real HOME restored even if the trap fires.
 _stask_qa_cleanup() {
@@ -72,7 +88,7 @@ _stask_qa_cleanup() {
     export HOME="$STASK_QA_SANDBOX_REAL_HOME"
     unset STASK_QA_SANDBOX_REAL_HOME
   fi
-  unset STASK_QA_SANDBOX STASK_HOME
+  unset STASK_QA_SANDBOX GH_TOKEN
 }
 trap _stask_qa_cleanup EXIT
 

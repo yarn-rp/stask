@@ -79,7 +79,6 @@ gh repo clone "$REPO" "$SCRATCH/dummy-repo" -- --quiet 2>&1 | sed 's/^/  /' || {
 
 # Now it's safe to switch HOME
 export HOME="$SCRATCH"
-export STASK_HOME="$SCRATCH/.stask"
 mkdir -p "$HOME/.openclaw"
 
 # ── 5. Render answers file ──────────────────────────────────────

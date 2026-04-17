@@ -1,0 +1,17 @@
+{
+  "_comment": "Static answers for `stask setup`. Dynamic keys (Repo path, Bot Token, App Token, Your Slack user ID, Your name, GitHub username) are filled in by install.sh from credentials.json. Keys match the `message` field of each clack prompt exactly (em-dashes are U+2014, arrows U+2192).",
+
+  "Project name": "stask-qa-dummy",
+  "Found incomplete setup. Resume?": true,
+
+  "Tech Lead — Plans, specs, delegates, reviews": "professor",
+  "Backend Engineer — API, DB, auth, integrations": "berlin",
+  "Frontend Engineer — Pages, components, styling": "tokyo",
+  "QA Engineer — Browser tests, API tests, reports": "helsinki",
+
+  "Use these models?": true,
+  "Workspace exists. Overwrite?": true,
+
+  "Project Slack channel": "create",
+  "Project task board (Slack List)": "create"
+}

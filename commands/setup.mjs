@@ -458,15 +458,19 @@ export async function run(args) {
 
   // OpenClaw restart
   console.log('');
-  const shouldRestart = guard(await confirm({ message: 'Restart OpenClaw gateway to load your new agents?' }));
-  if (shouldRestart) {
-    s.start('Restarting OpenClaw gateway...');
-    try {
-      execFileSync('openclaw', ['gateway', 'restart'], { encoding: 'utf-8', timeout: 15000 });
-      s.stop(pc.green('Gateway restarted \u2014 agents are live!'));
-    } catch { s.stop(pc.yellow('Restart failed \u2014 run manually: openclaw gateway restart')); }
+  if (process.env.STASK_SKIP_GATEWAY_RESTART) {
+    log.info(pc.dim('Skipping gateway restart (STASK_SKIP_GATEWAY_RESTART).'));
   } else {
-    log.info(pc.dim('Run manually when ready: openclaw gateway restart'));
+    const shouldRestart = guard(await confirm({ message: 'Restart OpenClaw gateway to load your new agents?' }));
+    if (shouldRestart) {
+      s.start('Restarting OpenClaw gateway...');
+      try {
+        execFileSync('openclaw', ['gateway', 'restart'], { encoding: 'utf-8', timeout: 15000 });
+        s.stop(pc.green('Gateway restarted \u2014 agents are live!'));
+      } catch { s.stop(pc.yellow('Restart failed \u2014 run manually: openclaw gateway restart')); }
+    } else {
+      log.info(pc.dim('Run manually when ready: openclaw gateway restart'));
+    }
   }
 
   // Done

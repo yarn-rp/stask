@@ -62,6 +62,8 @@ stask heartbeat helsinki
 | `source activate.sh`         | Default. Ephemeral `$HOME` seeded with a complete 4-agent team. |
 | `source activate.sh --empty` | Empty `$HOME` + `$HOME/.openclaw` + `git init`'d `$HOME/dummy-repo`. For testing `stask setup` itself from scratch. |
 | `source reset.sh`            | Wipe current sandbox, re-seed. Useful mid-session after a destructive test. |
+| `bash cleanup.sh`            | Archive the channel and delete the canvases the last `install.sh` created in the Slack workspace. Reads `credentials.json` so it cleans whichever workspace those tokens belong to. Pass `--dry-run` to preview, `--wipe-seed` to also nuke local `seed/` and `SEED_VERSION`. |
+| `bash install.sh --skip-cleanup` | Skip the pre-install cleanup step (useful when you just switched `credentials.json` to a new workspace and the old one is already cleaned). |
 
 ### Environment Helsinki inherits
 
@@ -96,9 +98,32 @@ warning: lib/setup has changed since install — seed may be stale
 
 The warning doesn't block activation — an agent testing a setup.mjs change *wants* the stale seed so they can verify the new install flow against the old shape. But if you're testing something else and see the warning, re-run install.
 
+## Switching workspaces (e.g. migrating to a Pro workspace for Slack Lists)
+
+Slack Lists are a paid-tier feature. If your dummy workspace is Free, `stask setup` will happily complete channel + canvas creation, but the task-board List step will fail with `unknown_method`. If your main workspace is on Pro/Business+, one option is to host the QA apps there.
+
+To migrate:
+
+1. **Clean up the old workspace first** (before you change credentials — `cleanup.sh` uses whatever tokens are in `credentials.json`):
+   ```bash
+   bash test/qa-sandbox/cleanup.sh --wipe-seed
+   ```
+2. **Create 4 fresh apps in the new workspace** using the same manifests — Slack apps are workspace-scoped, so you can't move them, but the manifests are identical:
+   ```bash
+   node test/qa-sandbox/print-manifests.mjs --write /tmp/qa-manifests
+   # paste each file into api.slack.com → New App → From a manifest
+   ```
+3. **Install each app, grab the new bot + app tokens**, and update `~/.stask-qa/credentials.json` with the new values. Also update `slack.humanUserId` if your ID in the new workspace differs.
+4. **Re-run install against the new workspace**. Skip auto-cleanup since the old workspace was already cleaned:
+   ```bash
+   bash test/qa-sandbox/install.sh --skip-cleanup
+   ```
+
+(If the "dummy" apps aren't yours to delete, you can leave them in the old workspace — they'll just sit idle with archived channels.)
+
 ## Known limits
 
-- **Slack rate limits**: re-running `install.sh` creates a new channel/list/canvas every time. If you regenerate the seed frequently, the dummy workspace will accumulate cruft. Archive old channels periodically.
+- **Slack rate limits**: re-running `install.sh` creates a new channel + canvases every time. `install.sh` now auto-runs `cleanup.sh` first, so repeat runs don't accumulate. If something crashes mid-install you can always run `bash cleanup.sh` manually.
 - **Skills**: `install.sh` sets `STASK_SKIP_SKILLS_INSTALL=1` so seed generation doesn't pull hundreds of MB of clawhub skills over the network. Stask-specific skills (`stask-general`, `stask-lead`, etc.) are still symlinked from the repo. If a test specifically needs a clawhub skill installed, unset that env and re-install.
 - **Gateway restart**: shimmed to a noop (`STASK_SKIP_GATEWAY_RESTART=1`). Verifying the gateway actually reloads a new config is out of scope for this sandbox.
 - **Real Slack API**: tests hit real Slack. This is good for catching API-shape drift but means the sandbox won't work offline.
@@ -128,9 +153,10 @@ seed/
 
 | File | Role |
 |---|---|
-| `install.sh` | One-time: validates creds, `npm link`, regenerates `seed/` by running `stask setup`. |
-| `activate.sh` | Source to enter the sandbox. Creates ephemeral `$HOME`, rsyncs from `seed/`, traps cleanup. |
+| `install.sh` | One-time: validates creds, `npm link`, auto-cleans prior artifacts, regenerates `seed/` by running `stask setup`. |
+| `activate.sh` | Source to enter the sandbox. Creates ephemeral `$HOME`, rsyncs from `seed/`, exports `GH_TOKEN`, wires `gh` as a git credential helper, traps cleanup. |
 | `reset.sh` | Source to wipe + re-activate. |
+| `cleanup.sh` | Archives the sandbox's Slack channel + deletes its canvases. Invoked automatically by `install.sh`; also runnable manually. |
 | `credentials.example.json` | Template for `~/.stask-qa/credentials.json`. |
 | `print-manifests.mjs` | Dumps the 4 Slack app manifests to paste into api.slack.com. Reads from the real `templates/team/<role>/manifest.json` via `generateSlackManifest()` — no forked templates. |
 | `fixtures/setup-answers.template.json` | Static answers for `stask setup` prompts. Dynamic values (tokens, repo path, gh login) merged in by `install.sh`. |

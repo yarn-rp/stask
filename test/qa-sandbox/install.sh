@@ -55,6 +55,16 @@ gh repo view "$REPO" --json name >/dev/null 2>&1 || {
   exit 1
 }
 
+# ── 2b. Clean up artifacts from a prior install (best-effort) ───
+# If seed/ exists we previously created a channel + canvas in Slack; archive
+# them first so re-runs don't accumulate cruft. Pass --skip-cleanup to bypass
+# (e.g. when the credentials already point at a different workspace).
+if [ -d "$SANDBOX_DIR/seed" ] && [[ " $* " != *" --skip-cleanup "* ]]; then
+  step "Cleaning artifacts from prior install"
+  bash "$SANDBOX_DIR/cleanup.sh" 2>&1 | sed 's/^/  /' || dim "  (cleanup reported errors — continuing)"
+  echo
+fi
+
 # ── 3. Link the worktree stask binary ───────────────────────────
 step "Linking stask worktree at $REPO_ROOT"
 (cd "$REPO_ROOT" && npm link >/dev/null)

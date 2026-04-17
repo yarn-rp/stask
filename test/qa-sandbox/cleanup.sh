@@ -1,16 +1,21 @@
 #!/usr/bin/env bash
 # cleanup.sh — tear down Slack artifacts the QA sandbox installed.
 #
-# Finds the `{slug}-project` channel in the workspace, pulls the attached
-# canvas, deletes the canvas, archives the channel. Uses the Lead agent's
-# bot token from ~/.stask-qa/credentials.json — so point credentials at
-# the workspace you want to clean BEFORE running this. (If you switched
-# credentials to a new workspace first, you'll clean the wrong workspace.)
+# Finds the `{slug}-project` channel in the workspace, deletes every canvas
+# tab attached to it, and clears the bookmarks. Does NOT archive the
+# channel — once archived, the bot gets kicked out and Slack's API won't
+# let it unarchive itself (only an admin can, via the UI). Leaving the
+# channel active lets `stask setup` reuse it cleanly on the next install.
+#
+# Uses the Lead agent's bot token from ~/.stask-qa/credentials.json, so it
+# operates on whichever workspace those tokens belong to. If you're about
+# to switch workspaces, run cleanup BEFORE editing credentials.
 #
 # Usage:
-#   bash test/qa-sandbox/cleanup.sh                 # archive channel + delete canvas
-#   bash test/qa-sandbox/cleanup.sh --wipe-seed     # also delete local seed/ and SEED_VERSION
-#   bash test/qa-sandbox/cleanup.sh --dry-run       # just report what it would do
+#   bash test/qa-sandbox/cleanup.sh               # delete canvases + bookmarks
+#   bash test/qa-sandbox/cleanup.sh --wipe-seed   # also delete local seed/ + SEED_VERSION
+#   bash test/qa-sandbox/cleanup.sh --dry-run     # preview without calling destructive APIs
+#   bash test/qa-sandbox/cleanup.sh --archive     # also archive the channel (admin UI needed to undo)
 
 set -euo pipefail
 
@@ -25,12 +30,14 @@ step()  { printf '\033[36m→\033[0m %s\n' "$*"; }
 # ── Args ────────────────────────────────────────────────────────
 WIPE_SEED=0
 DRY=0
+ARCHIVE=0
 for arg in "$@"; do
   case "$arg" in
     --wipe-seed) WIPE_SEED=1 ;;
     --dry-run)   DRY=1 ;;
+    --archive)   ARCHIVE=1 ;;
     -h|--help)
-      sed -n '2,14p' "$0" | sed 's/^# \?//'
+      sed -n '2,17p' "$0" | sed 's/^# \?//'
       exit 0
       ;;
   esac
@@ -134,9 +141,25 @@ else
   fi
 
   if [ -n "$CHAN_ID" ]; then
-    step "Archiving channel $CHAN_ID"
-    RES=$(api 'conversations.archive' "{\"channel\":\"$CHAN_ID\"}" | api_result)
-    if [ "$RES" = "ok" ]; then green "  ✓ archived"; else red "  FAILED: $RES"; fi
+    # Wipe bookmarks — every install adds fresh ones and they accumulate.
+    step "Clearing channel bookmarks"
+    BOOKMARKS=$(api_get 'bookmarks.list' "channel_id=$CHAN_ID" \
+      | jq_like bookmarks.list "(d.bookmarks || []).map(b => b.id).join(' ')")
+    if [ -z "$BOOKMARKS" ]; then
+      dim "  none"
+    else
+      for BID in $BOOKMARKS; do
+        RES=$(api 'bookmarks.remove' "{\"channel_id\":\"$CHAN_ID\",\"bookmark_id\":\"$BID\"}" | api_result)
+        if [ "$RES" = "ok" ]; then green "  ✓ removed $BID"; else dim "  skipped $BID ($RES)"; fi
+      done
+    fi
+
+    if [ "$ARCHIVE" = "1" ]; then
+      step "Archiving channel $CHAN_ID"
+      red "  warning: once archived, the bot is kicked and only a workspace admin can unarchive via the Slack UI"
+      RES=$(api 'conversations.archive' "{\"channel\":\"$CHAN_ID\"}" | api_result)
+      if [ "$RES" = "ok" ]; then green "  ✓ archived"; else red "  FAILED: $RES"; fi
+    fi
   fi
 fi
 

@@ -11,25 +11,30 @@
  *   7. Removes Slack token from ~/.stask/config.json
  *   8. Removes setup state file
  *
- * Does NOT delete Slack apps or channels (those must be removed manually from api.slack.com).
+ * Does NOT delete Slack apps (those must be removed manually from api.slack.com).
  *
- * Usage: stask teardown <project-slug> [--force]
+ * Usage: stask teardown <project-slug> [--force] [--with-slack]
+ *
+ *   --with-slack  also archive the Slack channel and delete the List + Canvas
+ *                 created by setup. Reads IDs from .stask/config.json.
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 
 import { loadProjectsRegistry, saveProjectsRegistry, GLOBAL_STASK_DIR } from '../lib/resolve-home.mjs';
-import { configGet, configSetBatch, cronRemove, agentsDelete } from '../lib/setup/openclaw-cli.mjs';
+import { configGet, configSetBatch, configUnset, cronRemove, agentsDelete, readRawSecret } from '../lib/setup/openclaw-cli.mjs';
+import { archiveChannel, deleteList, deleteCanvas } from '../lib/setup/slack-teardown.mjs';
 
 const OPENCLAW_HOME = path.join(process.env.HOME || '', '.openclaw');
 
 export async function run(args) {
   const slug = args[0];
   const force = args.includes('--force');
+  const withSlack = args.includes('--with-slack');
 
   if (!slug) {
-    console.error('Usage: stask teardown <project-slug> [--force]');
+    console.error('Usage: stask teardown <project-slug> [--force] [--with-slack]');
     console.error('');
     console.error('This removes all local artifacts created by `stask setup`:');
     console.error('  - OpenClaw workspace + agent directories');
@@ -38,7 +43,9 @@ export async function run(args) {
     console.error('  - .stask/ project directory');
     console.error('  - Project registry entry');
     console.error('');
-    console.error('Slack apps and channels must be removed manually at https://api.slack.com/apps');
+    console.error('  --with-slack  also archive the Slack channel and delete the List + Canvas');
+    console.error('');
+    console.error('Slack apps themselves must still be removed manually at https://api.slack.com/apps');
     process.exit(1);
   }
 
@@ -70,19 +77,73 @@ export async function run(args) {
 
   // ── Confirm ──────────────────────────────────────────────────
 
+  // Read .stask/config.json up-front so --with-slack has the channel/list/
+  // canvas IDs even during the confirmation summary.
+  const staskConfigPath = repoPath ? path.join(repoPath, '.stask', 'config.json') : null;
+  const staskConfig = staskConfigPath && fs.existsSync(staskConfigPath)
+    ? safeReadJson(staskConfigPath)
+    : null;
+
   console.log(`\nTeardown: ${slug}`);
   console.log('─'.repeat(40));
   if (agentIds.length) console.log(`  Agents:    ${agentIds.join(', ')}`);
   if (fs.existsSync(workspaceDir)) console.log(`  Workspace: ${workspaceDir}`);
   if (repoPath) console.log(`  .stask/:   ${path.join(repoPath, '.stask')}`);
+  if (withSlack) {
+    const ch = staskConfig?.slack?.channelId;
+    const li = staskConfig?.slack?.listId;
+    const ca = staskConfig?.canvasId;
+    console.log(`  Slack:     channel=${ch || 'n/a'}, list=${li || 'n/a'}, canvas=${ca || 'n/a'}`);
+  }
   console.log('');
 
   if (!force) {
     console.log('This will permanently delete all the above. Run with --force to confirm.');
     console.log('');
-    console.log('Note: Slack apps and channels must be removed manually at:');
-    console.log('  https://api.slack.com/apps');
+    console.log(withSlack
+      ? 'Slack apps themselves must still be removed manually at https://api.slack.com/apps'
+      : 'Pass --with-slack to also archive the channel and delete the List/Canvas.');
     process.exit(0);
+  }
+
+  // ── 0. Tear down Slack resources (BEFORE removing tokens) ────
+  //
+  // Step 1 below wipes channels.slack.accounts, so we need the lead's
+  // botToken NOW while it's still there. Archive is used instead of delete
+  // for the channel — Slack has no channel-delete API, only archive (which
+  // is reversible from the UI).
+
+  if (withSlack && staskConfig) {
+    const leadName = Object.entries(staskConfig.agents || {}).find(([, v]) => v.role === 'lead')?.[0];
+    // readRawSecret bypasses the CLI's automatic redaction (which returns
+    // "__OPENCLAW_REDACTED__" for bot tokens via `openclaw config get`).
+    const leadToken = leadName
+      ? readRawSecret(`channels.slack.accounts.${leadName}.botToken`)
+      : undefined;
+
+    if (!leadToken) {
+      console.log('  ⚠ --with-slack: lead token not found; skipping Slack resource cleanup');
+    } else {
+      const channelId = staskConfig.slack?.channelId;
+      const listId = staskConfig.slack?.listId;
+      const canvasId = staskConfig.canvasId;
+
+      if (canvasId) {
+        const r = await deleteCanvas({ botToken: leadToken, canvasId });
+        console.log(r.ok ? `  ✓ Canvas deleted${r.note ? ` (${r.note})` : ''}` : `  ⚠ Canvas: ${r.error}`);
+      }
+      if (listId) {
+        const r = await deleteList({ botToken: leadToken, listId });
+        console.log(r.ok ? `  ✓ List deleted${r.note ? ` (${r.note})` : ''}` : `  ⚠ List: ${r.error}`);
+      }
+      if (channelId) {
+        const r = await archiveChannel({ botToken: leadToken, channelId });
+        console.log(r.ok ? `  ✓ Channel archived${r.note ? ` (${r.note})` : ''}` : `  ⚠ Channel: ${r.error}`);
+      }
+      if (!canvasId && !listId && !channelId) {
+        console.log('  ⚠ --with-slack: no channel/list/canvas IDs in .stask/config.json — nothing to remove');
+      }
+    }
   }
 
   // ── 1. Remove agents from openclaw.json via the CLI ──────────
@@ -109,16 +170,6 @@ export async function run(args) {
     if (bindingsAfter.length !== bindingsBefore.length) {
       ops.push({ path: 'bindings', value: bindingsAfter });
     }
-    // channels.slack.accounts: we set each removed id to null so the batch
-    // applier unsets it. (OpenClaw's set batch treats null as unset for
-    // map-typed paths; objects with known scalar keys round-trip fine.)
-    const existingAccounts = configGet('channels.slack.accounts') || {};
-    for (const id of agentIds) {
-      if (existingAccounts[id] !== undefined) {
-        ops.push({ path: `channels.slack.accounts.${id}`, value: null });
-      }
-    }
-
     if (ops.length > 0) {
       try {
         configSetBatch(ops);
@@ -126,6 +177,19 @@ export async function run(args) {
       } catch (err) {
         // Don't abort teardown on a single write failure — surface and move on.
         console.log(`  ⚠ openclaw.json cleanup failed: ${err.message}`);
+      }
+    }
+
+    // channels.slack.accounts.<id> can't be unset via the set-batch (null
+    // values fail schema with "expected object, received null"). `config
+    // unset` removes the key properly. One call per id — these are rare.
+    const existingAccounts = configGet('channels.slack.accounts') || {};
+    for (const id of agentIds) {
+      if (existingAccounts[id] === undefined) continue;
+      try {
+        configUnset(`channels.slack.accounts.${id}`);
+      } catch (err) {
+        console.log(`  ⚠ Could not unset channels.slack.accounts.${id}: ${err.message}`);
       }
     }
 
@@ -211,6 +275,15 @@ export async function run(args) {
   console.log('');
   console.log('Manual cleanup still needed:');
   console.log(`  • Delete Slack apps at https://api.slack.com/apps`);
-  console.log(`  • Delete Slack channel #${slug}-project`);
+  if (!withSlack) {
+    console.log(`  • Archive Slack channel #${slug}-project (or re-run with --with-slack)`);
+  }
   console.log(`  • Run: openclaw gateway restart`);
+}
+
+// ─── Helpers ─────────────────────────────────────────────────
+
+function safeReadJson(p) {
+  try { return JSON.parse(fs.readFileSync(p, 'utf-8')); }
+  catch { return null; }
 }

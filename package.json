@@ -12,6 +12,7 @@
     "commands/",
     "skills/",
     ".agents/",
+    "templates/",
     "config.example.json"
   ],
   "scripts": {

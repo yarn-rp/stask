@@ -173,8 +173,9 @@ seed/
 | File | Role |
 |---|---|
 | `install.sh` | One-time: validates creds, `npm link`, auto-cleans prior artifacts, regenerates `seed/` by running `stask setup`. |
-| `activate.sh` | Source to enter the sandbox. Creates ephemeral `$HOME`, rsyncs from `seed/`, exports `GH_TOKEN`, wires `gh` as a git credential helper, traps local cleanup. |
-| `deactivate.sh` | Source to end a session cleanly — runs Slack cleanup, deletes local `$HOME`, clears sandbox env vars, cancels the EXIT trap. |
+| `session-begin.sh` | **The one-command entry point for an agent to start testing a task.** Takes `T-XXX`, looks up the worktree via `stask show`, runs `npm link` in real `$HOME`, then activates the sandbox. Gets the ordering (link-before-swap) right so you don't have to think about it. |
+| `activate.sh` | Source to enter the sandbox. Creates ephemeral `$HOME`, rsyncs from `seed/`, exports `GH_TOKEN`, wires `gh` as a git credential helper. Idempotent — second source is a fast no-op. |
+| `deactivate.sh` | Source to end a session cleanly — runs Slack cleanup, deletes local `$HOME`, clears sandbox env vars. |
 | `reset.sh` | Source to wipe + re-activate. |
 | `cleanup.sh` | Deletes canvas tabs on the sandbox's Slack channel. Channel-discovery is tolerant of counter-suffix variants (`{slug}-project-1`, `-2`, …). Invoked automatically by `install.sh` and `deactivate.sh`; also runnable manually. |
 | `fixtures/bootstrap-channel.mjs` | Pre-provisions the project Slack channel before `stask setup` runs — picks up any existing active `{slug}-project[-N]` channel, or creates a fresh counter-suffix variant if the base name is locked by an archived channel. |

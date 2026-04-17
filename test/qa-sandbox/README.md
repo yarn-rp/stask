@@ -47,22 +47,38 @@ EOF
 ## Daily use (Helsinki)
 
 ```bash
-source test/qa-sandbox/activate.sh           # enter
-cd "$HOME/dummy-repo" && stask list          # …do work
-source test/qa-sandbox/deactivate.sh         # tear down Slack artifacts + local HOME
+source test/qa-sandbox/activate.sh           # enter — first call seeds, later calls are no-op re-exports
+cd "$HOME/dummy-repo" && stask list          # …do work, across as many bash calls as you want
+source test/qa-sandbox/deactivate.sh         # end the session — Slack cleanup + wipe local state
 ```
 
-The shell-exit trap in `activate.sh` will also clean up the local `$HOME` if you forget to deactivate, but **it won't clean up the Slack side** — that requires `deactivate.sh`. Auto-cleaning Slack on every shell exit was considered but rejected: agent sessions commonly span multiple short-lived shells (each `bash -c 'source activate.sh; ...'` is a fresh shell), and thrashing Slack state between them would make the sandbox unusable.
+### How state persistence works
 
-If you do forget to deactivate, the next `install.sh` invokes cleanup as its first step, so artifacts don't accumulate forever — they just linger until the next install.
+`$HOME` points at a **stable** path (`/tmp/stask-qa-active` by default), not a per-shell temp dir. That means:
+
+- Call 1 (fresh): `source activate.sh` rsyncs the seed into `/tmp/stask-qa-active/`, creates `.stask-qa-sandbox-active` marker, exports env.
+- Call 2+ (reuse): `source activate.sh` sees the marker, skips rsync, just re-exports `HOME`, `GH_TOKEN`, `STASK_QA_SANDBOX=1`. Fast (~50ms).
+- Any task you create in one call survives into the next.
+- When you're done: `source deactivate.sh` wipes the directory + cleans Slack.
+
+### Why not auto-cleanup on shell exit?
+
+Agent sessions span many short-lived shells — every `bash -c 'source activate.sh; …'` exits immediately. Tearing down Slack state on every exit would make the sandbox unusable across tool invocations. Explicit deactivation is the clean signal.
+
+If you forget to deactivate, the next `install.sh` runs cleanup as its first step — artifacts don't accumulate forever, they just linger until then.
+
+### Concurrent sandboxes
+
+Only one stable sandbox per host by default. For multiple, pass `STASK_QA_STABLE_HOME=/tmp/stask-qa-xyz source activate.sh` — each gets its own stable dir.
 
 ### Modes
 
 | Command | What it does |
 |---|---|
-| `source activate.sh`          | Default. Ephemeral `$HOME` seeded with a complete 4-agent team. |
+| `source activate.sh`          | Enter the stable sandbox. First call seeds `/tmp/stask-qa-active`; later calls are fast no-op re-exports. |
 | `source activate.sh --empty`  | Empty `$HOME` + `$HOME/.openclaw` + `git init`'d `$HOME/dummy-repo`. For testing `stask setup` itself from scratch. |
-| `source reset.sh`             | Wipe current sandbox, re-seed. Useful mid-session after a destructive test. |
+| `source activate.sh --fresh`  | Nuke any existing sandbox at `/tmp/stask-qa-active` and re-seed. Use when you want a clean slate mid-session. |
+| `source reset.sh`             | Alias for `--fresh`. Wipes + re-seeds. |
 | `source deactivate.sh`        | End a session: run Slack cleanup, delete ephemeral `$HOME`, clear env. What you call when you're truly done. |
 | `bash cleanup.sh`             | Just the Slack-side cleanup (delete canvases, clear bookmarks). Called automatically by `install.sh` and `deactivate.sh`. `--dry-run` previews, `--wipe-seed` also nukes local `seed/`, `--archive` also archives the channel (admin UI needed to undo). |
 | `bash install.sh --skip-cleanup` | Skip the pre-install cleanup step (useful when credentials were just swapped to a new workspace). |

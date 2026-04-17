@@ -28,25 +28,30 @@ fi
 _DEACT_SANDBOX_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _DEACT_SANDBOX_HOME="$HOME"
 _DEACT_REAL_HOME="${STASK_QA_SANDBOX_REAL_HOME:-$HOME}"
+_DEACT_STABLE_HOME="${STASK_QA_STABLE_HOME:-/tmp/stask-qa-active}"
 
 # 1. Restore real HOME so cleanup.sh can read ~/.stask-qa/credentials.json.
 export HOME="$_DEACT_REAL_HOME"
 
-# 2. Tear down Slack artifacts (channel stays active, canvases + bookmarks purged).
+# 2. Tear down Slack artifacts (channel stays active, canvases purged).
 if [ -z "${STASK_QA_NO_CLEANUP:-}" ]; then
   bash "$_DEACT_SANDBOX_DIR/cleanup.sh" || printf '\033[33mcleanup reported errors \u2014 continuing\033[0m\n' >&2
 else
   printf '\033[2mskipping Slack cleanup (STASK_QA_NO_CLEANUP set)\033[0m\n'
 fi
 
-# 3. Delete the ephemeral $HOME.
-if [ -d "$_DEACT_SANDBOX_HOME" ] && [[ "$_DEACT_SANDBOX_HOME" == /tmp/stask-qa.* ]]; then
+# 3. Delete the stable sandbox HOME.
+if [ -d "$_DEACT_STABLE_HOME" ] && [ -f "$_DEACT_STABLE_HOME/.stask-qa-sandbox-active" ]; then
+  rm -rf "$_DEACT_STABLE_HOME"
+fi
+# Best-effort: also handle any older-style ephemeral dir, in case an agent
+# is running with pre-upgrade state.
+if [ -d "$_DEACT_SANDBOX_HOME" ] && [[ "$_DEACT_SANDBOX_HOME" == /tmp/stask-qa.* ]] && [ "$_DEACT_SANDBOX_HOME" != "$_DEACT_STABLE_HOME" ]; then
   rm -rf "$_DEACT_SANDBOX_HOME"
 fi
 
-# 4. Clear sandbox env + cancel the EXIT trap installed by activate.sh.
+# 4. Clear sandbox env.
 unset STASK_QA_SANDBOX STASK_QA_SANDBOX_REAL_HOME GH_TOKEN
-trap - EXIT
 
 printf '\033[32m\u2713 sandbox deactivated\033[0m\n'
-unset _DEACT_SANDBOX_DIR _DEACT_SANDBOX_HOME _DEACT_REAL_HOME
+unset _DEACT_SANDBOX_DIR _DEACT_SANDBOX_HOME _DEACT_REAL_HOME _DEACT_STABLE_HOME

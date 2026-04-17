@@ -24,6 +24,7 @@ import { setupCronJobs } from '../lib/setup/cron-setup.mjs';
 import { getSkillCount } from '../lib/setup/skills.mjs';
 import { initProject } from './init.mjs';
 import { loadManifests, getRoles, getLeadRole, generateSlackManifest } from '../lib/setup/manifest.mjs';
+import { configGet, readRawSecret } from '../lib/setup/openclaw-cli.mjs';
 
 // Shared step functions — used by both full wizard and --only partial mode
 import {
@@ -547,11 +548,13 @@ async function runPartial({ onlySteps, detectedRepoPath }) {
   const staskConfig = JSON.parse(fs.readFileSync(staskConfigPath, 'utf-8'));
   const slug = staskConfig.project;
 
-  // Find lead token from openclaw.json
-  const ocPath = path.join(OPENCLAW_HOME, 'openclaw.json');
-  const oc = fs.existsSync(ocPath) ? JSON.parse(fs.readFileSync(ocPath, 'utf-8')) : {};
+  // Find lead token by reading openclaw.json directly. readRawSecret bypasses
+  // the CLI's automatic redaction (`openclaw config get` returns
+  // "__OPENCLAW_REDACTED__" for bot tokens). Read-only, no gateway race.
   const leadName = Object.entries(staskConfig.agents || {}).find(([, v]) => v.role === 'lead')?.[0];
-  const leadToken = oc.channels?.slack?.accounts?.[leadName]?.botToken;
+  const leadToken = leadName
+    ? readRawSecret(`channels.slack.accounts.${leadName}.botToken`)
+    : undefined;
 
   if (!leadToken) {
     log.error('Could not find lead agent token. Ensure Slack apps are configured.');

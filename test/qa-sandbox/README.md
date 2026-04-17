@@ -47,23 +47,26 @@ EOF
 ## Daily use (Helsinki)
 
 ```bash
-source test/qa-sandbox/activate.sh
-# $HOME is now /tmp/stask-qa.XXXXXX with a full team ready.
-cd $HOME/dummy-repo
-stask list       # shows the seeded sample tasks (none initially, add tasks with `stask create`)
-stask heartbeat helsinki
-# ...test anything. Exit the shell → sandbox auto-deletes.
+source test/qa-sandbox/activate.sh           # enter
+cd "$HOME/dummy-repo" && stask list          # …do work
+source test/qa-sandbox/deactivate.sh         # tear down Slack artifacts + local HOME
 ```
+
+The shell-exit trap in `activate.sh` will also clean up the local `$HOME` if you forget to deactivate, but **it won't clean up the Slack side** — that requires `deactivate.sh`. Auto-cleaning Slack on every shell exit was considered but rejected: agent sessions commonly span multiple short-lived shells (each `bash -c 'source activate.sh; ...'` is a fresh shell), and thrashing Slack state between them would make the sandbox unusable.
+
+If you do forget to deactivate, the next `install.sh` invokes cleanup as its first step, so artifacts don't accumulate forever — they just linger until the next install.
 
 ### Modes
 
 | Command | What it does |
 |---|---|
-| `source activate.sh`         | Default. Ephemeral `$HOME` seeded with a complete 4-agent team. |
-| `source activate.sh --empty` | Empty `$HOME` + `$HOME/.openclaw` + `git init`'d `$HOME/dummy-repo`. For testing `stask setup` itself from scratch. |
-| `source reset.sh`            | Wipe current sandbox, re-seed. Useful mid-session after a destructive test. |
-| `bash cleanup.sh`            | Archive the channel and delete the canvases the last `install.sh` created in the Slack workspace. Reads `credentials.json` so it cleans whichever workspace those tokens belong to. Pass `--dry-run` to preview, `--wipe-seed` to also nuke local `seed/` and `SEED_VERSION`. |
-| `bash install.sh --skip-cleanup` | Skip the pre-install cleanup step (useful when you just switched `credentials.json` to a new workspace and the old one is already cleaned). |
+| `source activate.sh`          | Default. Ephemeral `$HOME` seeded with a complete 4-agent team. |
+| `source activate.sh --empty`  | Empty `$HOME` + `$HOME/.openclaw` + `git init`'d `$HOME/dummy-repo`. For testing `stask setup` itself from scratch. |
+| `source reset.sh`             | Wipe current sandbox, re-seed. Useful mid-session after a destructive test. |
+| `source deactivate.sh`        | End a session: run Slack cleanup, delete ephemeral `$HOME`, clear env. What you call when you're truly done. |
+| `bash cleanup.sh`             | Just the Slack-side cleanup (delete canvases, clear bookmarks). Called automatically by `install.sh` and `deactivate.sh`. `--dry-run` previews, `--wipe-seed` also nukes local `seed/`, `--archive` also archives the channel (admin UI needed to undo). |
+| `bash install.sh --skip-cleanup` | Skip the pre-install cleanup step (useful when credentials were just swapped to a new workspace). |
+| `STASK_QA_NO_CLEANUP=1 source deactivate.sh` | Skip Slack cleanup on deactivate (for debugging). |
 
 ### Environment Helsinki inherits
 
@@ -154,9 +157,11 @@ seed/
 | File | Role |
 |---|---|
 | `install.sh` | One-time: validates creds, `npm link`, auto-cleans prior artifacts, regenerates `seed/` by running `stask setup`. |
-| `activate.sh` | Source to enter the sandbox. Creates ephemeral `$HOME`, rsyncs from `seed/`, exports `GH_TOKEN`, wires `gh` as a git credential helper, traps cleanup. |
+| `activate.sh` | Source to enter the sandbox. Creates ephemeral `$HOME`, rsyncs from `seed/`, exports `GH_TOKEN`, wires `gh` as a git credential helper, traps local cleanup. |
+| `deactivate.sh` | Source to end a session cleanly — runs Slack cleanup, deletes local `$HOME`, clears sandbox env vars, cancels the EXIT trap. |
 | `reset.sh` | Source to wipe + re-activate. |
-| `cleanup.sh` | Archives the sandbox's Slack channel + deletes its canvases. Invoked automatically by `install.sh`; also runnable manually. |
+| `cleanup.sh` | Deletes canvas tabs on the sandbox's Slack channel. Channel-discovery is tolerant of counter-suffix variants (`{slug}-project-1`, `-2`, …). Invoked automatically by `install.sh` and `deactivate.sh`; also runnable manually. |
+| `fixtures/bootstrap-channel.mjs` | Pre-provisions the project Slack channel before `stask setup` runs — picks up any existing active `{slug}-project[-N]` channel, or creates a fresh counter-suffix variant if the base name is locked by an archived channel. |
 | `credentials.example.json` | Template for `~/.stask-qa/credentials.json`. |
 | `print-manifests.mjs` | Dumps the 4 Slack app manifests to paste into api.slack.com. Reads from the real `templates/team/<role>/manifest.json` via `generateSlackManifest()` — no forked templates. |
 | `fixtures/setup-answers.template.json` | Static answers for `stask setup` prompts. Dynamic values (tokens, repo path, gh login) merged in by `install.sh`. |

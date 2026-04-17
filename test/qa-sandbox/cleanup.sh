@@ -91,12 +91,21 @@ jq_like() {
 }
 
 # ── 1. Find the channel by name ─────────────────────────────────
-step "Looking up #$CHANNEL_NAME"
-CHAN_ID=$(api 'conversations.list' '{"types":"public_channel,private_channel","limit":1000,"exclude_archived":true}' \
-  | jq_like conversations.list "(d.channels || []).find(c => c.name === '$CHANNEL_NAME')?.id")
+# Slack's conversations.list honours exclude_archived only via GET query
+# params; JSON body is ignored (and then returns archived rows too).
+# Match the base channel or any counter-suffix variant bootstrap-channel.mjs
+# might have created.
+step "Looking up #$CHANNEL_NAME (or counter-suffix variants)"
+CHAN_ID=$(api_get 'conversations.list' 'types=public_channel&limit=1000&exclude_archived=true' \
+  | jq_like conversations.list "
+    (d.channels || [])
+      .filter(c => !c.is_archived)
+      .filter(c => c.name === '$CHANNEL_NAME' || c.name.match(new RegExp('^$CHANNEL_NAME-\\\\d+\$')))
+      .sort((a, b) => a.name === '$CHANNEL_NAME' ? -1 : 1)[0]?.id
+  ")
 
 if [ -z "$CHAN_ID" ]; then
-  dim "  nothing to archive — no active channel named #$CHANNEL_NAME"
+  dim "  nothing to clean — no active channel matching #$CHANNEL_NAME"
 else
   green "  found $CHAN_ID"
 fi
@@ -141,18 +150,10 @@ else
   fi
 
   if [ -n "$CHAN_ID" ]; then
-    # Wipe bookmarks — every install adds fresh ones and they accumulate.
-    step "Clearing channel bookmarks"
-    BOOKMARKS=$(api_get 'bookmarks.list' "channel_id=$CHAN_ID" \
-      | jq_like bookmarks.list "(d.bookmarks || []).map(b => b.id).join(' ')")
-    if [ -z "$BOOKMARKS" ]; then
-      dim "  none"
-    else
-      for BID in $BOOKMARKS; do
-        RES=$(api 'bookmarks.remove' "{\"channel_id\":\"$CHAN_ID\",\"bookmark_id\":\"$BID\"}" | api_result)
-        if [ "$RES" = "ok" ]; then green "  ✓ removed $BID"; else dim "  skipped $BID ($RES)"; fi
-      done
-    fi
+    # Skip bookmark cleanup — bookmarks.list needs `bookmarks:read` which
+    # stask's manifests don't request. Stask's setup is idempotent on
+    # bookmarks (re-adding the same one returns already_exists), so they
+    # don't accumulate in practice.
 
     if [ "$ARCHIVE" = "1" ]; then
       step "Archiving channel $CHAN_ID"

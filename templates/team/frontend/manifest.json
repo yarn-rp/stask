@@ -15,7 +15,8 @@
       "nextjs-expert",
       "shadcn-ui",
       "tailwind-v4-shadcn",
-      "figma-integration"
+      "figma-integration",
+      "openai-codex-operator"
     ],
     "shareFromLead": [
       "code-review",
@@ -23,10 +24,6 @@
       "technical-spec-design"
     ],
     "stask": ["stask-general", "stask-worker"]
-  },
-
-  "cron": {
-    "heartbeat": "5,25,45 * * * *"
   },
 
   "subagents": "lead-only",

@@ -21,13 +21,14 @@
       "agent-orchestration-multi-agent-optimize",
       "agentic-workflow-automation",
       "pre-mortem-analyst",
-      "feature-specification"
+      "feature-specification",
+      "openai-codex-operator"
     ],
     "stask": ["stask-general", "stask-lead"]
   },
 
   "cron": {
-    "heartbeat": "0,20,40 * * * *"
+    "heartbeat": "*/5 * * * *"
   },
 
   "subagents": "all",

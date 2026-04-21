@@ -46,6 +46,29 @@ CREATE TABLE IF NOT EXISTS active_sessions (
   claimed_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS acp_sessions (
+  label        TEXT PRIMARY KEY,
+  task_id      TEXT REFERENCES tasks(task_id),
+  agent        TEXT NOT NULL,
+  subtask_id   TEXT,
+  started_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  last_ping_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_acp_sessions_task ON acp_sessions(task_id);
+CREATE INDEX IF NOT EXISTS idx_acp_sessions_agent ON acp_sessions(agent);
+
+CREATE TABLE IF NOT EXISTS subtask_bundles (
+  task_id            TEXT NOT NULL REFERENCES tasks(task_id),
+  agent              TEXT NOT NULL,
+  primary_subtask_id TEXT NOT NULL,
+  member_subtask_id  TEXT NOT NULL,
+  ordinal            INTEGER NOT NULL DEFAULT 0,
+  created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (task_id, agent, member_subtask_id)
+);
+CREATE INDEX IF NOT EXISTS idx_subtask_bundles_primary
+  ON subtask_bundles(task_id, agent, primary_subtask_id);
+
 CREATE TABLE IF NOT EXISTS slack_row_ids (
   task_id  TEXT PRIMARY KEY REFERENCES tasks(task_id),
   row_id   TEXT NOT NULL

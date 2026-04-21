@@ -278,16 +278,42 @@ Use the inbox commands instead:
 This command is preserved for reference; removal scheduled for v0.3.0.
 `,
 
-  session: `stask session — Manage session locks.
+  session: `stask session — Manage session locks and ACP session liveness.
 
 USAGE
+  # Task-level locks (one per task)
   stask session claim <task-id> --agent <name> --session-id <id>
   stask session release <task-id> [--session-id <id>]
   stask session status [<task-id>]
 
+  # ACP session liveness (label-keyed, for acpx Codex sessions)
+  stask session ping --label <name> [--task <task-id>] [--agent <agent>] [--subtask <subtask-id>]
+  stask session health --label <name> [--hang-timeout <minutes>] [--json]
+  stask session acp-list [--task <task-id>] [--agent <agent>] [--json]
+  stask session acp-close (--label <name> | --task <task-id>)
+
+  # Worker bundling decisions (survive worker re-spawn)
+  stask session bundles-save --task <task-id> --agent <agent> --bundles <json>
+  stask session bundles-get --task <task-id> --agent <agent> [--json]
+  stask session bundles-clear --task <task-id>
+
 DESCRIPTION
-  Session locks prevent two agent runtimes from claiming the same task.
+  Task-level locks prevent two agent runtimes from claiming the same task.
   Stale claims are auto-cleaned based on heartbeat freshness.
+
+  ACP session liveness tracks label-keyed acpx Codex sessions (e.g.
+  "T-042:berlin:s1"). Sessions can be multi-per-task (one per lead exploration,
+  one per worker bundle). 'ping' is called from inside acpx sessions; 'health'
+  returns alive | hung | missing (exit code: 0 / 1 / 2).
+
+EXAMPLES
+  stask session ping --label T-042:berlin:s1 --task T-042 --agent berlin --subtask T-042.1
+  stask session health --label T-042:berlin:s1 --hang-timeout 3 --json
+  stask session acp-list --task T-042
+  stask session acp-close --task T-042
+  echo '[{"primarySubtaskId":"T-042.1","memberSubtaskIds":["T-042.1","T-042.2"]}]' \\
+    | stask session bundles-save --task T-042 --agent berlin
+  stask session bundles-get --task T-042 --agent berlin --json
 `,
 
   sync: `stask sync — Run one bidirectional sync cycle (Slack ↔ DB).

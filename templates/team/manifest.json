@@ -1,18 +1,27 @@
 {
   "name": "Full-Stack Engineering Team",
-  "version": "1.0.0",
-  "description": "Lead + Backend + Frontend + QA with OpenClaw orchestration",
+  "version": "2.0.0",
+  "description": "Lead + Worker + QA with lead-driven supervision and Codex-via-acpx coding",
 
   "skills": {
     "universal": ["find-skills", "actual-self-improvement", "vassili-clawhub-cli"]
   },
 
   "openclaw": {
-    "heartbeat": { "every": "10m" },
     "compaction": { "mode": "safeguard" },
     "maxConcurrent": 4,
     "subagents": { "maxConcurrent": 8 },
     "memorySearch": { "provider": "ollama" }
+  },
+
+  "acp": {
+    "enabled": true,
+    "cli": "acpx",
+    "agent": "codex",
+    "pingIntervalSeconds": 60,
+    "hangTimeoutMinutes": 3,
+    "ttlSeconds": 0,
+    "fallback": "sessions_spawn"
   },
 
   "stask": {

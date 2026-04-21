@@ -23,10 +23,6 @@
     "stask": ["stask-general", "stask-qa"]
   },
 
-  "cron": {
-    "heartbeat": "15,35,55 * * * *"
-  },
-
   "subagents": "lead-only",
 
   "slack": {

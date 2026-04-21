@@ -18,7 +18,8 @@
       "debug-pro",
       "docker-essentials",
       "fullstack-conventions",
-      "pull-request"
+      "pull-request",
+      "openai-codex-operator"
     ],
     "shareFromLead": [
       "code-review",
@@ -27,10 +28,6 @@
       "security-auditor"
     ],
     "stask": ["stask-general", "stask-worker"]
-  },
-
-  "cron": {
-    "heartbeat": "5,25,45 * * * *"
   },
 
   "subagents": "lead-only",

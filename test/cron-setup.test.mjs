@@ -131,7 +131,8 @@ describe('setupCronJobs (openclaw CLI)', () => {
     assert.equal(a[a.indexOf('--session') + 1], 'isolated');
     assert.equal(a[a.indexOf('--wake') + 1], 'now');
     const message = a[a.indexOf('--message') + 1];
-    assert.match(message, /supervisor tick/);
+    assert.match(message, /Pipeline tick/);
+    assert.match(message, /solo project agent/);
     assert.match(message, /acpx/);
   });
 

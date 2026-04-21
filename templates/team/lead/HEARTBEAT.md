@@ -1,8 +1,8 @@
-# HEARTBEAT.md — {{LEAD_NAME}} (Team Lead, sole supervisor)
+# HEARTBEAT.md — {{LEAD_NAME}} (Solo Project Agent)
 
-You are the **only scheduled actor**. Workers and QA do not self-poll; they run only when you summon them.
+You are the **only actor on this project**. No workers, no QA persona. You own every task end to end: spec → code → QA → PR → merge.
 
-This heartbeat must be fast. Read state, supervise live sessions, resume / spawn what's needed, return.
+This heartbeat must be fast. Read state, advance what you can by one phase, check session health, return.
 
 ---
 
@@ -12,97 +12,138 @@ This heartbeat must be fast. Read state, supervise live sessions, resume / spawn
 stask --project {{PROJECT_SLUG}} heartbeat {{LEAD_NAME_LOWER}}
 ```
 
-Parse the JSON. It returns `pendingTasks` grouped by agent (backend / frontend / qa / {{LEAD_NAME_LOWER}}). For each task you'll see `threadId`, `phase`, and an ordered list of subtasks per assignee.
+Parse the JSON. It returns a flat `pendingTasks` list — each entry has a suggested `action` (`requirements-analysis` / `plan` / `build` / `qa` / `create-pr` / `review-qa-failure`) and a prompt.
 
-If there's nothing to do, reply `HEARTBEAT_OK` and stop.
+If there's nothing pending, reply `HEARTBEAT_OK` and stop.
 
-## Step 2 — Supervise live acpx Codex sessions
+---
 
-For each active task (status `In-Progress` or later), check your own exploration session plus any worker Codex sessions. See `../shared/ACP_SPAWN.md` for the full supervise snippet; the gist is:
+## Step 2 — Supervise live acpx sessions
+
+Each active task has up to three long-lived acpx sessions, all backed by `{{ACP_AGENT}}`:
+
+| Label | Purpose | Lifetime |
+|---|---|---|
+| `<threadId>:explore` | Requirements analysis + codebase Q&A | From spec start until task Done |
+| `<threadId>:code` | Implementation; subtasks run sequentially inside | From first subtask until task Done |
+| `<threadId>:qa` | Verification; fresh session (no coding context) | From Testing until task Done |
+
+Health-check each before acting:
 
 ```bash
-# Your own exploration session for task T
-stask --project {{PROJECT_SLUG}} session health --label "<threadId>:{{LEAD_NAME_LOWER}}"
-# → alive / hung / missing. Resume or re-invoke acpx {{ACP_AGENT}} with the same -s name.
-
-# Each worker's bundle (primary subtask sP):
-stask --project {{PROJECT_SLUG}} session health --label "<threadId>:<worker>:<sP>"
+stask --project {{PROJECT_SLUG}} session health --label "<threadId>:<phase>"
+# Exit 0 alive · 1 hung · 2 missing
 ```
 
-Re-invoke `acpx {{ACP_AGENT}} -s <label> --ttl 0` with the same `-s` name on `hung` or `missing`. Same name ⇒ resume where it left off.
+Recovery:
+- `alive` → continue.
+- `hung` → `acpx {{ACP_AGENT}} cancel -s "<label>"`, then re-invoke with the original prompt.
+- `missing` → re-invoke with the original prompt; same `-s` name resumes the session.
 
-## Step 3 — New work: requirements, spec, delegation
+See `../shared/ACP_SPAWN.md` for the full acpx surface.
 
-For each new or unblocked task, pick one of these flows:
+---
 
-### 3a. Backlog task needs a spec (`phase: requirements-analysis`)
+## Step 3 — Advance phases
 
-1. Transition the task to `Spec Writing` status.
-2. Start (or resume) your long-running exploration session:
+For each entry in `pendingTasks`, execute the `action`:
+
+### 3a · `requirements-analysis` (Backlog task)
+
+1. Transition the task to `Requirements Analysis`.
+2. Spawn (or resume) the exploration session:
    ```bash
-   acpx {{ACP_AGENT}} -s "<threadId>:{{LEAD_NAME_LOWER}}" --cwd {{PROJECT_ROOT}} --ttl 0 \
+   acpx {{ACP_AGENT}} -s "<threadId>:explore" --cwd {{PROJECT_ROOT}} --ttl 0 \
      "Initial explore for task <id>: <brief from Slack>. Find related code, prior art, risks."
    ```
-3. Alternate between:
-   - **Slack ↔ human:** ask one or two clarifying questions at a time (use the `requirements-analysis` skill to structure the dialog).
-   - **Codex ↔ codebase:** feed each human answer in and ask follow-up codebase questions:
-     ```bash
-     acpx {{ACP_AGENT}} -s "<threadId>:{{LEAD_NAME_LOWER}}" --no-wait "<follow-up question>"
-     ```
-4. When you have enough, write the spec, post it to the thread, transition to `Ready for Human Review`.
-
-### 3b. Spec approved (`phase: plan-and-delegate`)
-
-1. Create subtasks from the spec (`stask subtask create --parent <taskId> --name "..." --assign <worker>`).
-2. For each `(taskId, worker)` group in `byAgent`, summon the worker via OpenClaw:
-   ```js
-   sessions_spawn({
-     agentId: "<worker-name>",
-     cwd: "{{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/<worker-name>",
-     runtime: "subagent",
-     label: "<threadId>:<worker-name>",
-     task: "<ordered subtask list + scope + conventions; worker decides bundling>"
-   })
+3. Dialog loop: one or two clarifying questions in Slack per tick; feed answers back via `--no-wait`:
+   ```bash
+   acpx {{ACP_AGENT}} -s "<threadId>:explore" --no-wait "<follow-up>"
    ```
+4. When you have enough, write the spec, post to the thread, transition → `Ready for Human Review`. **Keep the `T:explore` session alive** — you'll reuse it for PR review follow-ups.
 
-### 3c. PR ready for QA (`phase: qa`)
+### 3b · `plan` (Approved / To-Do, no subtasks)
 
-```js
-sessions_spawn({
-  agentId: "{{QA_NAME_LOWER}}",
-  cwd: "{{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{QA_NAME_LOWER}}",
-  runtime: "subagent",
-  label: "<threadId>:{{QA_NAME_LOWER}}",
-  task: "<PR ref + acceptance criteria>"
-})
-```
+1. Read the approved spec.
+2. Create ordered subtasks (`stask subtask create …`) and assign each to yourself.
+3. Transition parent → `In-Progress`. The next tick will surface `build` actions.
 
-### 3d. QA passed → close
+### 3c · `build` (In-Progress subtask)
 
-Review the PR (use Codex via `acpx {{ACP_AGENT}} -s "<threadId>:{{LEAD_NAME_LOWER}}"` for code spelunking), merge, transition to `Done`. At close:
+Run the subtask inside the task's coding session:
 
 ```bash
-stask --project {{PROJECT_SLUG}} session acp-close --task <taskId>
+acpx {{ACP_AGENT}} -s "<threadId>:code" --cwd {{PROJECT_ROOT}} --ttl 0 \
+  "Subtask <id>: <name>. Scope: <from spec>. Conventions: <repo conventions>."
 ```
 
-### 3e. QA failed → re-delegate
+One `T:code` session per task. Subtasks run **sequentially** inside it — subsequent subtasks reuse the same `-s` and inherit file context from prior ones. Verify the diff + tests, then:
 
-Create fix-subtasks and loop back to 3b. Worker's prior acpx sessions persist — re-invoking with the same `-s` preserves context.
+```bash
+stask --project {{PROJECT_SLUG}} subtask done <subtask-id>
+```
+
+When the last subtask completes, push the branch, open nothing yet — transition parent → `Testing`. Next tick will fire `qa`.
+
+### 3d · `qa` (Testing parent)
+
+Start a **fresh** session (no coding context):
+
+```bash
+acpx {{ACP_AGENT}} -s "<threadId>:qa" --cwd {{PROJECT_ROOT}} --ttl 0 \
+  "Verify task <id>. Spec file <id>. Acceptance criteria: <list>. Test each AC, capture evidence."
+```
+
+On retry after a failure, close + reopen the session for a clean slate:
+
+```bash
+stask --project {{PROJECT_SLUG}} session acp-close --label "<threadId>:qa"
+# …then re-spawn with the same -s name
+```
+
+Write the QA report to `shared/qa-reports/<slug>.md` and submit:
+
+```bash
+stask --project {{PROJECT_SLUG}} qa <taskId> --report shared/qa-reports/<slug>.md --verdict PASS
+```
+
+### 3e · `create-pr` (Testing + QA passed)
+
+1. Re-enter `T:explore` for code spelunking / diff review.
+2. Craft a PR body (Summary / Changes / Testing / Acceptance Criteria).
+3. `gh pr create --draft --base main --head <branch> --title "…" --body "…"`.
+4. Transition → `Ready for Human Review`.
+
+### 3f · `review-qa-failure` (In-Progress with logged QA fail)
+
+1. Review the latest QA report in `T:explore` (retains prior context).
+2. Create fix-subtasks assigned to yourself.
+3. Next tick runs them via `T:code` (session resumes).
+4. Re-enters `T:qa` afterwards; close + reopen `T:qa` before re-verifying.
+
+---
 
 ## Step 4 — Infrastructure sanity
 
 ```bash
 stask --project {{PROJECT_SLUG}} list --status "Ready for Human Review"
-```
-
-Ping {{HUMAN_NAME}} only if a task is waiting for initial human review and hasn't been pinged.
-
-```bash
 stask --project {{PROJECT_SLUG}} list --status Blocked
 ```
 
-Note blocked tasks for awareness.
+Ping {{HUMAN_NAME}} only for tasks waiting on human input that haven't been pinged yet.
 
-## Step 5 — Return
+---
 
-Reply with a short summary: sessions resumed / spawned, tasks delegated, items awaiting human review. Do NOT do spec / coding / QA work inline — route through acpx or sessions_spawn.
+## Step 5 — At task close
+
+When a task flips to `Done`, close all three acpx sessions:
+
+```bash
+stask --project {{PROJECT_SLUG}} session acp-close --task <taskId>
+```
+
+---
+
+## Step 6 — Return
+
+Reply with a short summary: phases advanced, sessions resumed/reopened, items awaiting human review. **Never hand-edit code** — if `acpx {{ACP_AGENT}} --version` fails, report up the chain and stop.

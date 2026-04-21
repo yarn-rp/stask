@@ -6,7 +6,7 @@
  *   stask session release <task-id> [--session-id <id>]
  *   stask session status [<task-id>]
  *
- * ACP session liveness (label-keyed, for acpx Codex sessions):
+ * ACP session liveness (label-keyed, for acpx coding sessions):
  *   stask session ping --label <name> [--task <task-id>] [--agent <agent>] [--subtask <subtask-id>]
  *   stask session health --label <name> [--hang-timeout <minutes>] [--json]
  *   stask session acp-list [--task <task-id>] [--agent <agent>] [--json]
@@ -14,7 +14,6 @@
  *   stask session acp-close --task <task-id>    # close all sessions for a task
  */
 
-import fs from 'node:fs';
 import { withDb } from '../lib/tx.mjs';
 import {
   claimTask,
@@ -26,15 +25,11 @@ import {
   listAcpSessions,
   closeAcpSession,
   closeAcpSessionsForTask,
-  saveSubtaskBundles,
-  getSubtaskBundles,
-  clearSubtaskBundles,
 } from '../lib/session-tracker.mjs';
 
 const SUBCOMMANDS = new Set([
   'claim', 'release', 'status',
   'ping', 'health', 'acp-list', 'acp-close',
-  'bundles-save', 'bundles-get', 'bundles-clear',
 ]);
 
 function parseArgs(argv) {
@@ -51,7 +46,6 @@ function parseArgs(argv) {
     else if (tok === '--json') { args.json = true; }
     else if (!tok.startsWith('-')) { args.positional.push(tok); }
   }
-  // Back-compat: first positional is taskId for claim/release/status.
   if (!args.taskId && args.positional.length > 0) args.taskId = args.positional[0];
   return args;
 }
@@ -77,14 +71,11 @@ export async function run(argv) {
       case 'health': return runHealth(db, args);
       case 'acp-list': return runAcpList(db, args);
       case 'acp-close': return runAcpClose(db, args);
-      case 'bundles-save': return runBundlesSave(db, args);
-      case 'bundles-get': return runBundlesGet(db, args);
-      case 'bundles-clear': return runBundlesClear(db, args);
     }
   });
 }
 
-// ─── Task-level locks (existing behavior, unchanged) ──────────────
+// ─── Task-level locks ──────────────────────────────────────────────
 
 function runClaim(db, args) {
   if (!args.taskId || !args.agent || !args.sessionId) {
@@ -125,7 +116,7 @@ function runStatus(db, args) {
   }
 }
 
-// ─── ACP session liveness (new, label-keyed) ──────────────────────
+// ─── ACP session liveness (label-keyed) ───────────────────────────
 
 function runPing(db, args) {
   if (!args.label) die('Usage: stask session ping --label <name> [--task <task-id>] [--agent <agent>] [--subtask <subtask-id>]');
@@ -149,7 +140,6 @@ function runHealth(db, args) {
     const age = result.ageMinutes != null ? ` (${result.ageMinutes}m since last ping)` : '';
     console.log(`${result.status}${age}`);
   }
-  // Exit code reflects status: 0 alive, 1 hung, 2 missing — makes shell scripting cheap.
   if (result.status === 'hung') process.exit(1);
   if (result.status === 'missing') process.exit(2);
 }
@@ -185,70 +175,4 @@ function runAcpClose(db, args) {
     return;
   }
   die('Usage: stask session acp-close --label <name>   OR   --task <task-id>');
-}
-
-// ─── Subtask bundles (worker's bundling choice) ────────────────────
-
-function readStdinJson() {
-  // Best-effort synchronous JSON read from stdin.
-  try {
-    const raw = fs.readFileSync(0, 'utf-8');
-    if (!raw.trim()) return null;
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
-function runBundlesSave(db, args) {
-  if (!args.taskId || !args.agent) {
-    die([
-      'Usage: stask session bundles-save --task <task-id> --agent <agent> --bundles <json>',
-      '',
-      'JSON shape:',
-      '  [{"primarySubtaskId":"T-042.1","memberSubtaskIds":["T-042.1","T-042.2"]}, ...]',
-      '',
-      'You can also pipe the JSON on stdin instead of passing --bundles.',
-    ].join('\n'));
-  }
-  let bundles = null;
-  if (args.bundles) {
-    try { bundles = JSON.parse(args.bundles); }
-    catch (err) { die(`invalid --bundles JSON: ${err.message}`); }
-  } else {
-    bundles = readStdinJson();
-  }
-  if (!Array.isArray(bundles)) die('bundles must be a JSON array');
-  for (const b of bundles) {
-    if (!b || typeof b.primarySubtaskId !== 'string' || !Array.isArray(b.memberSubtaskIds)) {
-      die('each bundle needs { primarySubtaskId, memberSubtaskIds[] }');
-    }
-  }
-  const result = saveSubtaskBundles(db, args.taskId, args.agent, bundles);
-  console.log(`saved ${result.bundles} bundle(s) for ${args.taskId}/${args.agent}`);
-}
-
-function runBundlesGet(db, args) {
-  if (!args.taskId || !args.agent) {
-    die('Usage: stask session bundles-get --task <task-id> --agent <agent> [--json]');
-  }
-  const bundles = getSubtaskBundles(db, args.taskId, args.agent);
-  if (!bundles) {
-    if (args.json) console.log('null');
-    else console.log(`no bundles saved for ${args.taskId}/${args.agent}`);
-    return;
-  }
-  if (args.json) {
-    console.log(JSON.stringify(bundles, null, 2));
-    return;
-  }
-  for (const b of bundles) {
-    console.log(`${b.primarySubtaskId}: ${b.memberSubtaskIds.join(', ')}`);
-  }
-}
-
-function runBundlesClear(db, args) {
-  if (!args.taskId) die('Usage: stask session bundles-clear --task <task-id>');
-  const result = clearSubtaskBundles(db, args.taskId);
-  console.log(`cleared ${result.removed} bundle row(s) for ${result.taskId}`);
 }

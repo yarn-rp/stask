@@ -1,7 +1,7 @@
 {
-  "name": "Full-Stack Engineering Team",
-  "version": "2.0.0",
-  "description": "Lead + Worker + QA with lead-driven supervision and Codex-via-acpx coding",
+  "name": "Solo Engineering Agent",
+  "version": "3.0.0",
+  "description": "Single project agent owns spec \u2192 code \u2192 QA \u2192 merge. Coding goes through acpx; three long-lived sessions per task (explore/code/qa).",
 
   "skills": {
     "universal": ["find-skills", "actual-self-improvement", "vassili-clawhub-cli"]
@@ -21,7 +21,7 @@
     "pingIntervalSeconds": 60,
     "hangTimeoutMinutes": 3,
     "ttlSeconds": 0,
-    "fallback": "sessions_spawn"
+    "fallback": "fail"
   },
 
   "stask": {

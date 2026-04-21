@@ -108,7 +108,7 @@ export async function run(args) {
 
   // ═══ PHASE 0 — Project Basics ═══
   phase(0);
-  log.info(pc.dim('We\'ll create an OpenClaw workspace, 4 AI agents, connect them to Slack,'));
+  log.info(pc.dim('We\'ll create an OpenClaw workspace, a solo project agent, connect it to Slack,'));
   log.info(pc.dim('and set up a stask project to track tasks.\n'));
 
   const projectName = guard(await text({ message: 'Project name', placeholder: 'my-saas', initialValue: detectedProjectName || '', validate: (v) => !v ? 'Required' : undefined }));
@@ -152,8 +152,8 @@ export async function run(args) {
   // ═══ PHASE 1 — Team Naming ═══
   if (!isStepDone(state, 'team')) {
     phase(1);
-    log.info(pc.dim(`Your team has ${ROLES.length} agents. Give them names \u2014 these become their`));
-    log.info(pc.dim('Slack identities and workspace directories. Theme them!\n'));
+    log.info(pc.dim('Your project has a single agent. Give it a name \u2014 this becomes its'));
+    log.info(pc.dim('Slack identity and workspace directory. Theme it!\n'));
 
     if (!state.data.agents) state.data.agents = {};
     for (const role of ROLES) {

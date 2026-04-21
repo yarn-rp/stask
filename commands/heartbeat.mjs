@@ -5,16 +5,21 @@
  *
  * Session-aware: skips tasks claimed by other live sessions.
  *
- * New architecture: the lead's response also includes a `byAgent` grouping
- * of pending subtasks so the supervisor loop can batch-delegate per
- * (task, worker) pair without recomputing the grouping client-side.
+ * Solo-agent pipeline: one project agent owns every task end to end. This
+ * command returns the flat list of active tasks the agent is assigned to,
+ * with a suggested action per task (requirements-analysis / plan / build /
+ * qa / create-pr / review-qa-failure). The agent decides what to drive
+ * forward per tick based on the phase loop in HEARTBEAT.md.
+ *
+ * Coding CLI (`acpx <agent>`) is configured per-project in `.stask/config.json`
+ * under `acp.agent`. This command does not hard-code it — prompts just say
+ * "acpx" and the agent's BODY.md knows which backend to drive.
  */
 
-import { CONFIG, getWorkspaceLibs } from '../lib/env.mjs';
+import { CONFIG } from '../lib/env.mjs';
 import { withDb } from '../lib/tx.mjs';
 import { getThreadRef } from '../lib/slack-row.mjs';
 import { isTaskClaimable } from '../lib/session-tracker.mjs';
-import { getLeadAgent } from '../lib/roles.mjs';
 
 export async function run(argv) {
   const agentName = argv[0];
@@ -33,6 +38,7 @@ export async function run(argv) {
   }
 
   const agentRole = agentConfig.role;
+  const acpAgent = CONFIG.acp?.agent || 'codex';
 
   const result = await withDb((db, libs) => {
     const allTasks = libs.trackerDb.getAllTasks();
@@ -43,7 +49,6 @@ export async function run(argv) {
     }
 
     const pendingTasks = [];
-    const workerSubtaskQueue = [];
 
     for (const task of myTasks) {
       const taskId = task['Task ID'];
@@ -58,33 +63,38 @@ export async function run(argv) {
 
       const specParsed = libs.validate.parseSpecValue(task['Spec']);
       const specFileId = specParsed?.fileId || 'unknown';
+      const wt = libs.trackerDb.getParentWorktree(isSubtask ? task['Parent'] : taskId);
+      const wtInstruction = wt ? ` Worktree: ${wt.path} (branch: ${wt.branch}).` : '';
 
       let action = null;
       let prompt = null;
 
-      // ─── Lead actions ──────────────────────────────────────────
-      if (agentRole === 'lead') {
-        if (status === 'Backlog' && !isSubtask) {
-          action = 'requirements-analysis';
-          prompt = `Task ${taskId} "${task['Task Name']}" is in Backlog. Drive requirements analysis: spawn (or resume) your exploration Codex session via \`acpx codex -s "<threadId>:${agentName}" --ttl 0 ...\`, alternate clarifying questions in Slack with codebase questions to Codex, then write the spec and transition to Ready for Human Review. Spec file ID once written: ${specFileId}.`;
-        } else if (status === 'To-Do' && !hasSubtasks) {
-          action = 'delegate';
-          const workers = Object.entries(CONFIG.agents)
-            .filter(([, a]) => a.role === 'worker')
-            .map(([n]) => n.charAt(0).toUpperCase() + n.slice(1));
-          prompt = `Task ${taskId} "${task['Task Name']}" spec has been approved. Create subtasks and delegate via sessions_spawn to the appropriate worker(s): ${workers.join(', ')}. The worker will decide its own bundling; you just ship the ordered subtask list. Spec file ID: ${specFileId}. After creating subtasks, transition the parent to In-Progress.`;
-        } else if (status === 'Testing' && !isSubtask) {
+      // Backlog parent → requirements analysis
+      if (status === 'Backlog' && !isSubtask) {
+        action = 'requirements-analysis';
+        prompt = `Task ${taskId} "${task['Task Name']}" is in Backlog. Drive requirements analysis: spawn (or resume) your exploration session via \`acpx ${acpAgent} -s "<threadId>:explore" --cwd ${wt?.path || '<repo>'} --ttl 0 ...\`, alternate clarifying questions in Slack with codebase questions to acpx, then write the spec and transition to Ready for Human Review. Spec file ID once written: ${specFileId}.`;
+      }
+      // To-Do parent, no subtasks yet → plan + create subtasks
+      else if (status === 'To-Do' && !isSubtask && !hasSubtasks) {
+        action = 'plan';
+        prompt = `Task ${taskId} "${task['Task Name']}" spec has been approved. Create an ordered subtask list from the spec and assign each subtask to yourself. Spec file ID: ${specFileId}. After creating subtasks, transition the parent to In-Progress. On the next tick you'll start running them in your \`<threadId>:code\` acpx session.`;
+      }
+      // In-Progress subtask assigned to you → build it via the <threadId>:code session
+      else if (status === 'In-Progress' && isSubtask) {
+        action = 'build';
+        prompt = `Build subtask ${taskId}: "${task['Task Name']}". Spec file ID: ${specFileId}.${wtInstruction}\n\nRun this subtask inside your task-lifecycle coding session: \`acpx ${acpAgent} -s "<threadId>:code" --cwd ${wt?.path || '<repo>'} --ttl 0 "<subtask prompt>"\`. The session persists across all subtasks for this task — subsequent subtasks reuse the same \`-s\` name. acpx ${acpAgent} --version must succeed before you start; if it doesn't, fail loud and report up the chain.\n\nWhen complete, run: stask subtask done ${taskId}`;
+      }
+      // Testing parent → QA via a fresh <threadId>:qa session
+      else if (status === 'Testing' && !isSubtask) {
+        // If the task has QA reports and PASSED, time to open the PR.
+        const qaReports = [task['QA Report 1'], task['QA Report 2'], task['QA Report 3']].filter(r => r !== 'None');
+        const taskLog = libs.trackerDb.getLogForTask(taskId);
+        const passed = taskLog.some(e => e.message.includes('QA PASS'));
+        if (passed) {
           action = 'create-pr';
-          const wt = libs.trackerDb.getParentWorktree(taskId);
-          const wtInstruction = wt ? ` Worktree: ${wt.path} (branch: ${wt.branch}).` : '';
-
-          const qaReports = [task['QA Report 1'], task['QA Report 2'], task['QA Report 3']]
-            .filter(r => r !== 'None');
-
           const subtasksList = libs.trackerDb.getSubtasks(taskId)
-            .map(s => `- ${s['Task ID']}: ${s['Task Name']} (${s['Assigned To']})`)
+            .map(s => `- ${s['Task ID']}: ${s['Task Name']}`)
             .join('\n');
-
           prompt = `Task ${taskId} "${task['Task Name']}" has PASSED QA. Create a pull request and transition to Ready for Human Review.
 
 SPEC: File ID ${specFileId}. Read it for the full context of what was built.
@@ -93,7 +103,7 @@ SUBTASKS COMPLETED:
 ${subtasksList}
 
 QA REPORT(S): ${qaReports.join(', ')}
-Download and read the QA report(s) from Slack. Include test results and reference screenshots in the PR description.
+Include test results and reference screenshots in the PR description.
 
 WORKTREE:${wtInstruction}
 
@@ -102,39 +112,24 @@ YOUR JOB:
 2. Read the QA report — what was tested, results, screenshots
 3. Review the git log: cd to worktree, run \`git log --oneline main..HEAD\`
 4. Review the diff: \`git diff main..HEAD --stat\`
-5. Write a rich PR description:
-   - **Summary:** what was built and why (from spec)
-   - **Changes:** key files changed and what each does (from diff)
-   - **Testing:** QA results — which ACs passed, reference screenshots (from QA report)
-   - **Acceptance Criteria:** checklist from spec, all checked off
-6. Create the draft PR:
-   \`gh pr create --base main --head <branch> --title "<concise title>" --body "<your description>" --draft\`
+5. Write a rich PR description (Summary / Changes / Testing / Acceptance Criteria)
+6. Create the draft PR: \`gh pr create --base main --head <branch> --title "<title>" --body "<body>" --draft\`
 7. Run: \`stask transition ${taskId} "Ready for Human Review"\`
 
-The PR description is what Yan sees first. Make it count.`;
-        } else if (status === 'In-Progress' && !isSubtask && hasSubtasks) {
-          const taskLog = libs.trackerDb.getLogForTask(taskId);
-          const hasQaFail = taskLog.some(e => e.message.includes('QA FAIL'));
-          if (hasQaFail) {
-            action = 'review-qa-failure';
-            const wt = libs.trackerDb.getParentWorktree(taskId);
-            const wtInstruction = wt ? ` Worktree: ${wt.path} (branch: ${wt.branch}).` : '';
-            prompt = `Task ${taskId} "${task['Task Name']}" returned from QA failure. Review the latest QA report via your \`T:${agentName}\` Codex session (it retains prior context). Identify what failed, then re-delegate fixes — same worker sessions will resume by name. Spec file ID: ${specFileId}.${wtInstruction}`;
-          }
+The PR description is what humans see first. Make it count.`;
+        } else {
+          action = 'qa';
+          prompt = `QA task ${taskId}: "${task['Task Name']}". Spec file ID: ${specFileId}.${wtInstruction}\n\nRun verification in a **fresh** acpx session: \`acpx ${acpAgent} -s "<threadId>:qa" --cwd ${wt?.path || '<repo>'} --ttl 0 "<test prompt from spec acceptance criteria>"\`. This is intentionally separate from the \`<threadId>:code\` session — QA does not inherit the coder's assumptions.\n\nTest each acceptance criterion, write a QA report to shared/qa-reports/<name>.md, and submit via: stask qa ${taskId} --report shared/qa-reports/<your-report>.md --verdict <PASS|FAIL>`;
         }
       }
-
-      // ─── Worker actions (collected, grouped by parent after loop) ─
-      if (agentRole === 'worker' && status === 'In-Progress' && isSubtask) {
-        workerSubtaskQueue.push({ task, specFileId });
-      }
-
-      // ─── QA actions ────────────────────────────────────────────
-      if (agentRole === 'qa' && status === 'Testing' && !isSubtask) {
-        action = 'qa';
-        const wt = libs.trackerDb.getParentWorktree(taskId);
-        const wtInstruction = wt ? `\nIMPORTANT: The code to test is in the task worktree at: ${wt.path} (branch: ${wt.branch}).` : '';
-        prompt = `QA task ${taskId}: "${task['Task Name']}". Spec file ID: ${specFileId}. Read the spec for acceptance criteria.${wtInstruction}\nTest each AC via browser at http://localhost:3000. Write QA report to shared/qa-reports/. Submit via: stask qa ${taskId} --report shared/qa-reports/<your-report>.md --verdict <PASS|FAIL>`;
+      // In-Progress parent with subtasks + logged QA failure → review & refix
+      else if (status === 'In-Progress' && !isSubtask && hasSubtasks) {
+        const taskLog = libs.trackerDb.getLogForTask(taskId);
+        const hasQaFail = taskLog.some(e => e.message.includes('QA FAIL'));
+        if (hasQaFail) {
+          action = 'review-qa-failure';
+          prompt = `Task ${taskId} "${task['Task Name']}" returned from QA failure. Review the latest QA report via your persistent \`<threadId>:explore\` session (it retains prior spec context). Identify what failed, create fix-subtasks assigned to yourself, and re-enter the \`<threadId>:code\` session to apply them — same session name, resumes where it left off. Spec file ID: ${specFileId}.${wtInstruction}`;
+        }
       }
 
       if (action && prompt) {
@@ -142,94 +137,6 @@ The PR description is what Yan sees first. Make it count.`;
         const thread = threadRef ? { channelId: threadRef.channelId, threadTs: threadRef.threadTs } : null;
         pendingTasks.push({ taskId, taskName: task['Task Name'], status, parent: task['Parent'], specFileId, action, prompt, thread });
       }
-    }
-
-    // ─── Group worker subtasks by parent into batch entries ────
-    if (workerSubtaskQueue.length > 0) {
-      const grouped = new Map();
-      for (const { task, specFileId } of workerSubtaskQueue) {
-        const parentId = task['Parent'];
-        if (!grouped.has(parentId)) grouped.set(parentId, []);
-        grouped.get(parentId).push({ task, specFileId });
-      }
-
-      for (const [parentId, subtasks] of grouped) {
-        const wt = libs.trackerDb.getParentWorktree(parentId);
-        const wtInstruction = wt
-          ? `\nWORKTREE: ${wt.path} (branch: ${wt.branch}). cd there before making any changes.`
-          : '';
-
-        const subtaskList = subtasks.map((s, i) =>
-          `${i + 1}. ${s.task['Task ID']}: "${s.task['Task Name']}"`
-        ).join('\n');
-
-        const doneCommands = subtasks.map(s =>
-          `npx @web42/stask subtask done ${s.task['Task ID']}`
-        ).join('\n');
-
-        const prompt = `You have ${subtasks.length} subtask(s) to implement. Inspect the list and **decide your own bundling** — group subtasks that share files / feature / dependency order into one Codex session (\`acpx codex -s "<threadId>:${agentName}:<primary-subtask>" --ttl 0 ...\`); run bundles sequentially.
-${wtInstruction}
-
-SUBTASKS:
-${subtaskList}
-
-Spec file ID: ${subtasks[0].specFileId}. Read the spec for full details on each subtask.
-
-WORKFLOW per bundle:
-1. Pick a primary subtask \`sP\`; group related subtasks with it
-2. Invoke Codex via acpx (session name \`<threadId>:${agentName}:<sP>\`) with the batched prompt
-3. Verify the diff + run any required tests
-4. For each subtask in the bundle: git add/commit/push referencing the subtask ID, then \`npx @web42/stask subtask done <subtask-id>\`
-5. Post progress to the thread
-6. Move to next bundle (don't close the prior Codex session — sessions persist per task lifecycle)
-
-DONE COMMANDS (run after completing each subtask):
-${doneCommands}
-
-IMPORTANT: All coding goes through Codex CLI via acpx (see BODY.md). \`codex --version\` must succeed at start — fail loud otherwise.`;
-
-        const threadRef = getThreadRef(db, parentId);
-        const thread = threadRef ? { channelId: threadRef.channelId, threadTs: threadRef.threadTs } : null;
-
-        if (subtasks.length === 1) {
-          const s = subtasks[0];
-          const singleWt = wt
-            ? `\nIMPORTANT: Work in the task worktree at: ${wt.path} (branch: ${wt.branch}). cd to that directory before making any changes.`
-            : '';
-          pendingTasks.push({
-            taskId: s.task['Task ID'],
-            taskName: s.task['Task Name'],
-            status: s.task['Status'],
-            parent: parentId,
-            specFileId: s.specFileId,
-            action: 'build',
-            prompt: `Build subtask ${s.task['Task ID']}: "${s.task['Task Name']}". Spec file ID: ${s.specFileId}. Read the spec for full details.${singleWt}\n\nAll coding goes through Codex CLI: \`acpx codex -s "<threadId>:${agentName}:${s.task['Task ID']}" --ttl 0 ...\`. codex --version must succeed at start.\n\nWhen complete, run: npx @web42/stask subtask done ${s.task['Task ID']}`,
-            thread,
-          });
-        } else {
-          pendingTasks.push({
-            taskId: parentId,
-            taskName: `[${subtasks.length} subtasks] ${subtasks.map(s => s.task['Task ID']).join(', ')}`,
-            status: 'In-Progress',
-            parent: 'None',
-            specFileId: subtasks[0].specFileId,
-            action: 'build-batch',
-            prompt,
-            thread,
-            subtaskIds: subtasks.map(s => s.task['Task ID']),
-          });
-        }
-      }
-    }
-
-    // ─── byAgent grouping for the lead (supervisor loop input) ──
-    //
-    // Walk ALL tasks (not just myTasks) to build a map keyed by assigned
-    // agent, with subtasks listed per parent task. The lead uses this to
-    // drive the supervisor loop in HEARTBEAT.md.
-    let byAgent = null;
-    if (agentRole === 'lead') {
-      byAgent = buildLeadByAgent(db, libs, allTasks);
     }
 
     // ─── Unprocessed inbox items ──────────────────────────────
@@ -241,108 +148,27 @@ IMPORTANT: All coding goes through Codex CLI via acpx (see BODY.md). \`codex --v
       // inbox tables may not exist yet
     }
 
-    const response = {
+    return {
       agent: agentName,
       role: agentRole,
       pendingTasks,
       inboxItems,
       config: {
         staleSessionMinutes: CONFIG.staleSessionMinutes,
+        acpAgent,
       },
     };
-    if (byAgent) response.byAgent = byAgent;
-    return response;
   });
 
   console.log(JSON.stringify(result, null, 2));
 }
 
-// ─── Helpers ───────────────────────────────────────────────────────
-
 function emptyResponse(agentName, agentRole) {
-  const r = {
+  return {
     agent: agentName,
     role: agentRole,
     pendingTasks: [],
     inboxItems: [],
-    config: { staleSessionMinutes: CONFIG.staleSessionMinutes },
+    config: { staleSessionMinutes: CONFIG.staleSessionMinutes, acpAgent: CONFIG.acp?.agent || 'codex' },
   };
-  if (agentRole === 'lead') r.byAgent = {};
-  return r;
-}
-
-/**
- * Build the lead's `byAgent` grouping:
- *
- *   {
- *     "berlin": [
- *       {
- *         parentTaskId, parentTaskName, threadId, phase,
- *         subtasks: [{ subtaskId, subtaskName, specFileId }, ...]
- *       },
- *     ],
- *     "helsinki": [ ... ],
- *   }
- *
- * `phase` reflects where the parent sits in the pipeline so the lead knows
- * what to do (delegate / supervise / qa / close).
- */
-function buildLeadByAgent(db, libs, allTasks) {
-  const byAgent = {};
-  // Lookup name → role from CONFIG.
-  const agentMeta = Object.fromEntries(
-    Object.entries(CONFIG.agents).map(([name, a]) => [
-      name.charAt(0).toUpperCase() + name.slice(1).toLowerCase(),
-      { name, role: a.role },
-    ])
-  );
-
-  // Index tasks by parent status for phase derivation.
-  const taskById = new Map(allTasks.map(t => [t['Task ID'], t]));
-
-  for (const task of allTasks) {
-    const isSubtask = task['Parent'] !== 'None';
-    const assignedDisplay = task['Assigned To'];
-    if (!assignedDisplay || assignedDisplay === 'None') continue;
-    const meta = agentMeta[assignedDisplay];
-    if (!meta) continue;
-    if (meta.role === 'lead') continue; // Lead's own work is elsewhere.
-    const status = task['Status'];
-    if (status === 'Done' || status === 'Blocked') continue;
-
-    // Only surface work that's actively in motion.
-    if (meta.role === 'worker' && !(isSubtask && status === 'In-Progress')) continue;
-    if (meta.role === 'qa' && !(!isSubtask && status === 'Testing')) continue;
-
-    const parentId = isSubtask ? task['Parent'] : task['Task ID'];
-    const parent = taskById.get(parentId);
-    if (!parent) continue;
-
-    const threadRef = getThreadRef(db, parentId);
-    const threadId = threadRef?.threadTs || null;
-
-    const bucket = (byAgent[meta.name] ||= []);
-    let entry = bucket.find(e => e.parentTaskId === parentId);
-    if (!entry) {
-      entry = {
-        parentTaskId: parentId,
-        parentTaskName: parent['Task Name'],
-        threadId,
-        phase: meta.role === 'qa' ? 'qa' : 'build',
-        subtasks: [],
-      };
-      bucket.push(entry);
-    }
-
-    if (isSubtask) {
-      const specParsed = libs.validate.parseSpecValue(parent['Spec']);
-      entry.subtasks.push({
-        subtaskId: task['Task ID'],
-        subtaskName: task['Task Name'],
-        specFileId: specParsed?.fileId || 'unknown',
-      });
-    }
-  }
-
-  return byAgent;
 }

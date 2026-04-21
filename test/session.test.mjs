@@ -8,7 +8,6 @@ import { createTestDb, insertTask } from './helpers/test-db.mjs';
 import {
   claimTask, releaseTask, getSessionStatus, isTaskClaimable, cleanStaleSessions,
   pingAcpSession, acpSessionHealth, listAcpSessions, closeAcpSession, closeAcpSessionsForTask,
-  saveSubtaskBundles, getSubtaskBundles, clearSubtaskBundles,
 } from '../lib/session-tracker.mjs';
 
 let db;
@@ -271,74 +270,3 @@ describe('ACP session liveness', () => {
   });
 });
 
-describe('Subtask bundles', () => {
-  beforeEach(() => {
-    db = createTestDb();
-    insertTask(db, { task_id: 'T-001' });
-    insertTask(db, { task_id: 'T-002' });
-  });
-
-  it('returns null when no bundling is saved', () => {
-    assert.equal(getSubtaskBundles(db, 'T-001', 'berlin'), null);
-  });
-
-  it('round-trips bundles in submission order', () => {
-    saveSubtaskBundles(db, 'T-001', 'berlin', [
-      { primarySubtaskId: 'T-001.1', memberSubtaskIds: ['T-001.1', 'T-001.2'] },
-      { primarySubtaskId: 'T-001.3', memberSubtaskIds: ['T-001.3'] },
-    ]);
-    const out = getSubtaskBundles(db, 'T-001', 'berlin');
-    assert.deepEqual(out, [
-      { primarySubtaskId: 'T-001.1', memberSubtaskIds: ['T-001.1', 'T-001.2'] },
-      { primarySubtaskId: 'T-001.3', memberSubtaskIds: ['T-001.3'] },
-    ]);
-  });
-
-  it('replace semantics on re-save (idempotent)', () => {
-    saveSubtaskBundles(db, 'T-001', 'berlin', [
-      { primarySubtaskId: 'T-001.1', memberSubtaskIds: ['T-001.1', 'T-001.2'] },
-    ]);
-    saveSubtaskBundles(db, 'T-001', 'berlin', [
-      { primarySubtaskId: 'T-001.2', memberSubtaskIds: ['T-001.2'] },
-    ]);
-    assert.deepEqual(getSubtaskBundles(db, 'T-001', 'berlin'), [
-      { primarySubtaskId: 'T-001.2', memberSubtaskIds: ['T-001.2'] },
-    ]);
-  });
-
-  it('scopes by (task, agent)', () => {
-    saveSubtaskBundles(db, 'T-001', 'berlin', [
-      { primarySubtaskId: 'T-001.1', memberSubtaskIds: ['T-001.1'] },
-    ]);
-    saveSubtaskBundles(db, 'T-001', 'tokyo', [
-      { primarySubtaskId: 'T-001.2', memberSubtaskIds: ['T-001.2'] },
-    ]);
-    saveSubtaskBundles(db, 'T-002', 'berlin', [
-      { primarySubtaskId: 'T-002.1', memberSubtaskIds: ['T-002.1'] },
-    ]);
-
-    assert.equal(getSubtaskBundles(db, 'T-001', 'berlin').length, 1);
-    assert.equal(getSubtaskBundles(db, 'T-001', 'tokyo').length, 1);
-    assert.equal(getSubtaskBundles(db, 'T-001', 'tokyo')[0].memberSubtaskIds[0], 'T-001.2');
-    assert.equal(getSubtaskBundles(db, 'T-002', 'berlin')[0].memberSubtaskIds[0], 'T-002.1');
-  });
-
-  it('clearSubtaskBundles drops every bundle row for a task (all agents)', () => {
-    saveSubtaskBundles(db, 'T-001', 'berlin', [
-      { primarySubtaskId: 'T-001.1', memberSubtaskIds: ['T-001.1'] },
-    ]);
-    saveSubtaskBundles(db, 'T-001', 'tokyo', [
-      { primarySubtaskId: 'T-001.2', memberSubtaskIds: ['T-001.2'] },
-    ]);
-    saveSubtaskBundles(db, 'T-002', 'berlin', [
-      { primarySubtaskId: 'T-002.1', memberSubtaskIds: ['T-002.1'] },
-    ]);
-
-    const r = clearSubtaskBundles(db, 'T-001');
-    assert.equal(r.removed, 2);
-    assert.equal(getSubtaskBundles(db, 'T-001', 'berlin'), null);
-    assert.equal(getSubtaskBundles(db, 'T-001', 'tokyo'), null);
-    // Other task untouched
-    assert.equal(getSubtaskBundles(db, 'T-002', 'berlin').length, 1);
-  });
-});

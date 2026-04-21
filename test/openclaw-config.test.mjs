@@ -198,7 +198,7 @@ describe('registerAgents (openclaw CLI)', () => {
     assert.equal(cfg.acp.hangTimeoutMinutes, 5);
     // Defaults are filled in for unspecified fields.
     assert.equal(cfg.acp.enabled, true);
-    assert.equal(cfg.acp.fallback, 'sessions_spawn');
+    assert.equal(cfg.acp.fallback, 'fail');
   });
 
   it('does nothing with acpDefaults if staskConfigPath is missing', async () => {

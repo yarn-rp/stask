@@ -1,7 +1,7 @@
 {
   "role": "lead",
-  "title": "Tech Lead",
-  "description": "Plans, specs, delegates, reviews",
+  "title": "Project Agent",
+  "description": "Solo project agent: owns spec, code (via acpx), QA (fresh acpx session), PR, and merge",
 
   "model": {
     "primary": "ollama/qwen3.5:cloud",

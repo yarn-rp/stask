@@ -1,10 +1,11 @@
 /**
  * stask teardown — Remove a team setup created by `stask setup`.
  *
- * Reverses everything setup created:
- *   1. Removes agents from openclaw.json (agents.list, Slack accounts, bindings)
- *   2. Removes heartbeat cron jobs from ~/.openclaw/cron/jobs.json
- *   3. Removes agent directories (~/.openclaw/agents/<id>/)
+ * Reverses everything setup created via OpenClaw's own CLI commands:
+ *   1. Removes agents via `openclaw agents delete <id> --force`
+ *      (which also drops their bindings + state dir)
+ *   2. Removes Slack accounts via `openclaw channels remove`
+ *   3. Removes heartbeat cron jobs via `openclaw cron list|rm`
  *   4. Removes workspace (~/.openclaw/workspace-<slug>/)
  *   5. Removes .stask/ from the repo
  *   6. Unregisters from ~/.stask/projects.json
@@ -20,6 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { loadProjectsRegistry, saveProjectsRegistry, GLOBAL_STASK_DIR } from '../lib/resolve-home.mjs';
+import { listAgents, deleteAgent, removeSlackAccount, listCronJobs, removeCronJob } from '../lib/setup/openclaw-cli.mjs';
 
 const OPENCLAW_HOME = path.join(process.env.HOME || '', '.openclaw');
 
@@ -46,23 +48,18 @@ export async function run(args) {
   const workspaceDir = path.join(OPENCLAW_HOME, `workspace-${slug}`);
   const stateFile = path.join(GLOBAL_STASK_DIR, `setup-state-${slug}.json`);
 
-  // Discover agent names from the workspace directory or openclaw.json
+  // Discover agent names via the openclaw CLI (agents whose workspace sits
+  // under this project's workspace dir).
   let agentIds = [];
+  try {
+    const allAgents = listAgents();
+    agentIds = allAgents
+      .filter((a) => a.workspace && a.workspace.includes(`workspace-${slug}/`))
+      .map((a) => a.id);
+  } catch {}
 
-  // Try from openclaw.json
-  const configPath = path.join(OPENCLAW_HOME, 'openclaw.json');
-  let ocConfig = null;
-  if (fs.existsSync(configPath)) {
-    try {
-      ocConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-      // Find agents whose workspace is under this project's workspace
-      agentIds = (ocConfig.agents?.list || [])
-        .filter((a) => a.workspace && a.workspace.includes(`workspace-${slug}/`))
-        .map((a) => a.id);
-    } catch {}
-  }
-
-  // Fallback: list directories in the workspace
+  // Fallback: list directories in the workspace (works even if openclaw CLI
+  // or gateway is unavailable).
   if (agentIds.length === 0 && fs.existsSync(workspaceDir)) {
     try {
       agentIds = fs.readdirSync(workspaceDir, { withFileTypes: true })
@@ -92,66 +89,54 @@ export async function run(args) {
     process.exit(0);
   }
 
-  // ── 1. Remove agents from openclaw.json ──────────────────────
+  // ── 1. Delete agents via openclaw CLI (drops bindings + state dir) ─
 
-  if (ocConfig) {
-    const idSet = new Set(agentIds);
-    let changed = false;
-
-    // Remove from agents.list
-    if (ocConfig.agents?.list) {
-      const before = ocConfig.agents.list.length;
-      ocConfig.agents.list = ocConfig.agents.list.filter((a) => !idSet.has(a.id));
-      if (ocConfig.agents.list.length < before) changed = true;
-    }
-
-    // Remove Slack accounts
-    if (ocConfig.channels?.slack?.accounts) {
-      for (const id of agentIds) {
-        if (ocConfig.channels.slack.accounts[id]) {
-          delete ocConfig.channels.slack.accounts[id];
-          changed = true;
-        }
-      }
-    }
-
-    // Remove bindings
-    if (ocConfig.bindings) {
-      const before = ocConfig.bindings.length;
-      ocConfig.bindings = ocConfig.bindings.filter((b) => !idSet.has(b.agentId));
-      if (ocConfig.bindings.length < before) changed = true;
-    }
-
-    if (changed) {
-      fs.writeFileSync(configPath, JSON.stringify(ocConfig, null, 2) + '\n');
-      console.log(`  ✓ Removed ${agentIds.length} agents from openclaw.json`);
-    }
-  }
-
-  // ── 2. Remove heartbeat cron jobs ────────────────────────────
-
-  const cronPath = path.join(OPENCLAW_HOME, 'cron', 'jobs.json');
-  if (fs.existsSync(cronPath)) {
+  let agentsRemoved = 0;
+  for (const id of agentIds) {
     try {
-      const cron = JSON.parse(fs.readFileSync(cronPath, 'utf-8'));
-      let removed = 0;
-      if (cron.jobs) {
-        for (const id of agentIds) {
-          const key = `${id}-heartbeat`;
-          if (cron.jobs[key]) {
-            delete cron.jobs[key];
-            removed++;
-          }
+      deleteAgent(id);
+      agentsRemoved++;
+    } catch (err) {
+      console.error(`  ! openclaw agents delete ${id} failed: ${err.message.split('\n')[0]}`);
+    }
+  }
+  if (agentsRemoved) console.log(`  ✓ Removed ${agentsRemoved} agents via openclaw agents delete`);
+
+  // ── 2. Remove Slack accounts ───────────────────────────────────
+
+  let slackRemoved = 0;
+  for (const id of agentIds) {
+    const res = removeSlackAccount(id);
+    if (res.ok) slackRemoved++;
+  }
+  if (slackRemoved) console.log(`  ✓ Removed ${slackRemoved} Slack accounts`);
+
+  // ── 3. Remove heartbeat cron jobs (gateway-dependent) ────────
+
+  try {
+    const list = listCronJobs({ allowGatewayDown: true });
+    if (list.gatewayDown) {
+      console.warn('  ! OpenClaw gateway unreachable — cron jobs left in place. Re-run teardown once gateway is back.');
+    } else {
+      let cronRemoved = 0;
+      for (const id of agentIds) {
+        const job = (list.jobs || []).find(j => j.name === `${id}-heartbeat`);
+        if (!job) continue;
+        try {
+          removeCronJob(job.id);
+          cronRemoved++;
+        } catch (err) {
+          console.error(`  ! openclaw cron rm ${job.id} failed: ${err.message.split('\n')[0]}`);
         }
       }
-      if (removed) {
-        fs.writeFileSync(cronPath, JSON.stringify(cron, null, 2) + '\n');
-        console.log(`  ✓ Removed ${removed} heartbeat cron jobs`);
-      }
-    } catch {}
+      if (cronRemoved) console.log(`  ✓ Removed ${cronRemoved} heartbeat cron jobs`);
+    }
+  } catch (err) {
+    console.error(`  ! cron cleanup skipped: ${err.message.split('\n')[0]}`);
   }
 
-  // ── 3. Remove agent directories ──────────────────────────────
+  // ── 3b. Ensure agent state dirs are gone (openclaw agents delete
+  //       usually handles this, but double-check for safety) ─────
 
   for (const id of agentIds) {
     const agentDir = path.join(OPENCLAW_HOME, 'agents', id);
@@ -159,7 +144,6 @@ export async function run(args) {
       fs.rmSync(agentDir, { recursive: true });
     }
   }
-  if (agentIds.length) console.log(`  ✓ Removed ${agentIds.length} agent directories`);
 
   // ── 4. Remove workspace ──────────────────────────────────────
 

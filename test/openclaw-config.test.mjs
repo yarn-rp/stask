@@ -72,6 +72,11 @@ if (cmd === 'channels' && sub === 'add') {
   process.stdout.write(\`Added Slack account "\${account}".\\n\`);
   process.exit(0);
 }
+if (cmd === 'config' && sub === 'set') {
+  // Echo back the path we just set so the caller sees a clean JSON line.
+  process.stdout.write(JSON.stringify({ ok: true, path: args[2] }) + '\\n');
+  process.exit(0);
+}
 process.stderr.write('unhandled: ' + cmd + ' ' + sub + '\\n');
 process.exit(2);
 `;
@@ -148,6 +153,47 @@ describe('registerAgents (openclaw CLI)', () => {
       assert.ok(a.args.includes('--non-interactive'));
       assert.ok(a.args.includes('--json'));
     }
+  });
+
+  it('applies Slack trust policy per account when humanSlackUserId is provided', async () => {
+    const res = await freshRegister({
+      projectSlug: 'demo',
+      agents: TEAM,
+      leadId: 'professor',
+      slackAccounts: SLACK,
+      humanSlackUserId: 'U0HUMAN1',
+    });
+    assert.deepEqual(res.slackAccounts.trustApplied.sort(), ['berlin', 'helsinki', 'professor']);
+
+    const calls = readLog();
+    const configSets = calls.filter(c => c.cmd === 'config' && c.sub === 'set');
+    // 4 writes per account (allowFrom, dmPolicy, groupPolicy, execApprovals) * 3 accounts = 12.
+    assert.equal(configSets.length, 12);
+
+    // Verify professor's allowFrom carries the human user id.
+    const profAllowFrom = configSets.find(c =>
+      c.args[2] === 'channels.slack.accounts.professor.allowFrom',
+    );
+    assert.ok(profAllowFrom);
+    assert.deepEqual(JSON.parse(profAllowFrom.args[3]), ['U0HUMAN1']);
+
+    // Exec approvals should be disabled.
+    const profExec = configSets.find(c =>
+      c.args[2] === 'channels.slack.accounts.professor.execApprovals',
+    );
+    assert.ok(profExec);
+    assert.deepEqual(JSON.parse(profExec.args[3]), { enabled: false });
+  });
+
+  it('skips trust policy when humanSlackUserId is not provided', async () => {
+    await freshRegister({
+      projectSlug: 'demo',
+      agents: TEAM.slice(0, 1),
+      leadId: 'professor',
+      slackAccounts: SLACK,
+    });
+    const calls = readLog();
+    assert.equal(calls.filter(c => c.cmd === 'config' && c.sub === 'set').length, 0);
   });
 
   it('skips agents that already exist; bindings still ensured via agents bind', async () => {

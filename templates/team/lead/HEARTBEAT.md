@@ -23,13 +23,13 @@ For each active task (status `In-Progress` or later), check your own exploration
 ```bash
 # Your own exploration session for task T
 stask --project {{PROJECT_SLUG}} session health --label "<threadId>:{{LEAD_NAME_LOWER}}"
-# → alive / hung / missing. Resume or re-invoke acpx codex with the same -s name.
+# → alive / hung / missing. Resume or re-invoke acpx {{ACP_AGENT}} with the same -s name.
 
 # Each worker's bundle (primary subtask sP):
 stask --project {{PROJECT_SLUG}} session health --label "<threadId>:<worker>:<sP>"
 ```
 
-Re-invoke `acpx codex -s <label> --ttl 0` with the same `-s` name on `hung` or `missing`. Same name ⇒ resume where it left off.
+Re-invoke `acpx {{ACP_AGENT}} -s <label> --ttl 0` with the same `-s` name on `hung` or `missing`. Same name ⇒ resume where it left off.
 
 ## Step 3 — New work: requirements, spec, delegation
 
@@ -40,14 +40,14 @@ For each new or unblocked task, pick one of these flows:
 1. Transition the task to `Spec Writing` status.
 2. Start (or resume) your long-running exploration session:
    ```bash
-   acpx codex -s "<threadId>:{{LEAD_NAME_LOWER}}" --cwd {{PROJECT_ROOT}} --ttl 0 \
+   acpx {{ACP_AGENT}} -s "<threadId>:{{LEAD_NAME_LOWER}}" --cwd {{PROJECT_ROOT}} --ttl 0 \
      "Initial explore for task <id>: <brief from Slack>. Find related code, prior art, risks."
    ```
 3. Alternate between:
    - **Slack ↔ human:** ask one or two clarifying questions at a time (use the `requirements-analysis` skill to structure the dialog).
    - **Codex ↔ codebase:** feed each human answer in and ask follow-up codebase questions:
      ```bash
-     acpx codex -s "<threadId>:{{LEAD_NAME_LOWER}}" --no-wait "<follow-up question>"
+     acpx {{ACP_AGENT}} -s "<threadId>:{{LEAD_NAME_LOWER}}" --no-wait "<follow-up question>"
      ```
 4. When you have enough, write the spec, post it to the thread, transition to `Ready for Human Review`.
 
@@ -79,7 +79,7 @@ sessions_spawn({
 
 ### 3d. QA passed → close
 
-Review the PR (use Codex via `acpx codex -s "<threadId>:{{LEAD_NAME_LOWER}}"` for code spelunking), merge, transition to `Done`. At close:
+Review the PR (use Codex via `acpx {{ACP_AGENT}} -s "<threadId>:{{LEAD_NAME_LOWER}}"` for code spelunking), merge, transition to `Done`. At close:
 
 ```bash
 stask --project {{PROJECT_SLUG}} session acp-close --task <taskId>

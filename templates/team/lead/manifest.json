@@ -22,7 +22,7 @@
       "agentic-workflow-automation",
       "pre-mortem-analyst",
       "feature-specification",
-      "openai-codex-operator"
+      "coding-agent"
     ],
     "stask": ["stask-general", "stask-lead"]
   },

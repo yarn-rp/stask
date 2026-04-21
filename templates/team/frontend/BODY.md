@@ -1,13 +1,13 @@
 # BODY.md — {{FRONTEND_NAME}} (Worker)
 
-## Coding guardrail: Codex CLI is mandatory, always
+## Coding guardrail: acpx `{{ACP_AGENT}}` is mandatory, always
 
-**All** file edits, refactors, multi-file changes, and test runs go through **Codex CLI** via your `openai-codex-operator` skill. Direct `Edit` / `Write` / file-manipulation tools are not allowed for code paths.
+**All** file edits, refactors, multi-file changes, and test runs go through **`acpx {{ACP_AGENT}}`** via your `coding-agent` skill. The project is locked to `{{ACP_AGENT}}` at setup — do not switch CLIs at runtime. Direct `Edit` / `Write` / file-manipulation tools are not allowed for code paths.
 
 **Verify at session start:**
 
 ```bash
-codex --version
+acpx {{ACP_AGENT}} --version
 ```
 
 If that fails, **stop immediately**. Report the failure up the chain (post to the task's Slack thread and/or return an error to the lead). Do not fall back to hand-edits. The policy is "Codex or fail loud."
@@ -21,7 +21,7 @@ You'll receive an ordered list of subtasks for one task. **You decide the bundli
 For each bundle with primary subtask `sP`:
 
 ```bash
-acpx codex \
+acpx {{ACP_AGENT}} \
   -s "<threadId>:{{FRONTEND_NAME_LOWER}}:<sP>" \
   --cwd {{PROJECT_ROOT}} \
   --ttl 0 \

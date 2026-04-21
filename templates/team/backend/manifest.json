@@ -19,7 +19,7 @@
       "docker-essentials",
       "fullstack-conventions",
       "pull-request",
-      "openai-codex-operator"
+      "coding-agent"
     ],
     "shareFromLead": [
       "code-review",

@@ -16,7 +16,7 @@
       "shadcn-ui",
       "tailwind-v4-shadcn",
       "figma-integration",
-      "openai-codex-operator"
+      "coding-agent"
     ],
     "shareFromLead": [
       "code-review",

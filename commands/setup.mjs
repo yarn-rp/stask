@@ -127,7 +127,20 @@ export async function run(args) {
 
   const humanName = guard(await text({ message: 'Your name', initialValue: ghName }));
   const humanGithub = guard(await text({ message: 'GitHub username', initialValue: ghUser }));
-  Object.assign(state.data, { projectName, projectSlug, repoPath: resolvedRepoPath, humanName, humanGithub });
+
+  // ACP coding CLI — which agent does acpx drive for every coding session.
+  // Baked into templates via {{ACP_AGENT}} and into .stask/config.json via acp.agent.
+  const acpAgent = guard(await select({
+    message: 'Coding CLI (acpx wraps this for every session)',
+    options: [
+      { value: 'codex', label: 'codex (OpenAI)', hint: 'Recommended — default in previous releases' },
+      { value: 'claude', label: 'claude (Anthropic Claude Code)', hint: 'Requires claude CLI on PATH' },
+      { value: 'opencode', label: 'opencode', hint: 'Requires opencode CLI on PATH' },
+    ],
+    initialValue: state.data.acpAgent || TEAM_MANIFEST?.acp?.agent || 'codex',
+  }));
+
+  Object.assign(state.data, { projectName, projectSlug, repoPath: resolvedRepoPath, humanName, humanGithub, acpAgent });
   completeStep(state, 'basics');
 
   process.on('SIGINT', () => {
@@ -413,7 +426,12 @@ export async function run(args) {
       slug: d.projectSlug, repoPath: d.repoPath, leadToken: d.slackAccounts[d.agents[LEAD_ROLE.id].name]?.botToken,
     });
 
-    await stepOpenclaw(s, regCtx, agentModels, TEAM_MANIFEST, d.slackAccounts);
+    // Inject the chosen ACP CLI into the team manifest before registering.
+    const teamManifestForRegister = {
+      ...TEAM_MANIFEST,
+      acp: { ...(TEAM_MANIFEST.acp || {}), agent: d.acpAgent || TEAM_MANIFEST?.acp?.agent || 'codex' },
+    };
+    await stepOpenclaw(s, regCtx, agentModels, teamManifestForRegister, d.slackAccounts);
     await stepCron(s, regCtx, AGENT_MANIFESTS);
 
     // stask project init
@@ -603,6 +621,9 @@ function buildPlaceholders(d) {
     '{{HUMAN_SLACK_USER_ID}}': d.humanSlackUserId || 'UXXXXXXXXXX',
     '{{SLACK_CHANNEL_ID}}': d.slackChannelId || 'C0XXXXXXXXX',
     '{{SLACK_LIST_ID}}': d.slackListId || 'YOUR_SLACK_LIST_ID',
+    '{{ACP_AGENT}}': d.acpAgent || 'codex',
+    '{{ACP_CLI}}': 'acpx',
+    '{{ACP_HANG_TIMEOUT}}': String(TEAM_MANIFEST?.acp?.hangTimeoutMinutes ?? 3),
   };
   // Dynamic: generate placeholders for each role from manifest
   for (const role of ROLES) {

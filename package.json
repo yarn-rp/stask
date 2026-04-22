@@ -1,6 +1,6 @@
 {
   "name": "@web42/stask",
-  "version": "0.2.20",
+  "version": "0.2.21",
   "description": "SQLite-backed task lifecycle CLI with Slack sync for AI agent teams",
   "type": "module",
   "bin": {

@@ -38,15 +38,25 @@
         "background_color": "{{AGENT_COLOR}}"
       },
       "features": {
+        "app_home": {
+          "home_tab_enabled": false,
+          "messages_tab_enabled": true,
+          "messages_tab_read_only_enabled": false
+        },
         "bot_user": {
-          "display_name": "{{AGENT_DISPLAY_NAME}}",
+          "display_name": "{{AGENT_DISPLAY_NAME}} (QA Engineer)",
           "always_online": true
+        },
+        "assistant_view": {
+          "assistant_description": "{{AGENT_DESCRIPTION}}",
+          "suggested_prompts": []
         }
       },
       "oauth_config": {
         "scopes": {
           "bot": [
             "app_mentions:read",
+            "assistant:write",
             "bookmarks:write",
             "canvases:read",
             "canvases:write",
@@ -55,6 +65,9 @@
             "channels:manage",
             "channels:read",
             "chat:write",
+            "chat:write.customize",
+            "commands",
+            "emoji:read",
             "files:read",
             "files:write",
             "groups:history",
@@ -64,27 +77,47 @@
             "im:write",
             "lists:read",
             "lists:write",
+            "mpim:history",
+            "mpim:read",
+            "mpim:write",
+            "pins:read",
+            "pins:write",
             "reactions:read",
             "reactions:write",
+            "remote_files:read",
+            "remote_files:share",
+            "remote_files:write",
+            "search:read.files",
             "users:read"
           ]
-        }
+        },
+        "pkce_enabled": false
       },
       "settings": {
         "event_subscriptions": {
           "bot_events": [
             "app_mention",
+            "assistant_thread_started",
+            "channel_rename",
+            "member_joined_channel",
+            "member_left_channel",
             "message.channels",
             "message.groups",
-            "message.im"
+            "message.im",
+            "message.mpim",
+            "pin_added",
+            "pin_removed",
+            "reaction_added",
+            "reaction_removed"
           ]
         },
         "interactivity": {
-          "is_enabled": false
+          "is_enabled": true
         },
         "org_deploy_enabled": false,
         "socket_mode_enabled": true,
-        "token_rotation_enabled": false
+        "token_rotation_enabled": false,
+        "is_mcp_enabled": false
       }
     }
   }

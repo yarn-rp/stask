@@ -17,8 +17,6 @@
       "code-review",
       "critical-code-reviewer",
       "security-auditor",
-      "agent-team-orchestration",
-      "agent-orchestration-multi-agent-optimize",
       "agentic-workflow-automation",
       "pre-mortem-analyst",
       "feature-specification",
@@ -30,8 +28,6 @@
   "cron": {
     "heartbeat": "*/5 * * * *"
   },
-
-  "subagents": "all",
 
   "slack": {
     "color": "#1b48cf",

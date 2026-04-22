@@ -1,31 +1,61 @@
-# Local Development Runbook
+# DEV.md — Local development runbook for {{PROJECT_NAME}}
 
-_Fill in during project setup._
+_Bootstrap fills this in. Update when commands change._
 
 ## Prerequisites
 
-_List required tools, versions, and setup steps._
+_List required tools + versions (runtime, package manager, DB, CLI deps)._
 
-## Starting the Stack
+## Starting the stack
 
-_Step-by-step instructions to get the project running locally._
+_Step-by-step commands to get the project running locally._
 
-## Useful Commands
+## Everyday commands
 
 ```bash
-_List your most-used development commands here._
+# Boot
+# Test
+# Lint
+# Type check
+# Build
 ```
 
-## Verifying Your Work
+## Verifying your work
 
-Before handing off to {{QA_NAME}}, always:
+Before transitioning a task to Testing, always:
 
-1. Type check passes
-2. Lint passes
-3. Manual test in browser
-4. Check dark mode (if applicable)
-5. Check mobile (if applicable)
+1. Type check passes.
+2. Lint passes.
+3. Tests relevant to the spec's ACs pass.
+4. Manual smoke of the golden path (and dark mode / mobile if UI).
 
-## Common Gotchas
+## Environment variables
 
-_Document non-obvious things that trip people up._
+_List all variables the project needs to boot or test. Document defaults and where to get the real values._
+
+| Variable | Required? | Purpose | Where to get it |
+|---|---|---|---|
+| `SLACK_TOKEN` | Yes | stask ↔ Slack sync | `~/.stask/config.json` or env |
+| ... | | | |
+
+## Known issues & tech debt
+
+Living document. {{LEAD_NAME}} updates this when it trips over something worth remembering. Don't fix without a spec.
+
+### Format
+
+```
+### <short title>
+- **Where:** <file paths / subsystems>
+- **Symptom:** <what breaks / what's awkward>
+- **Why it's not fixed yet:** <scope, risk, priority>
+- **If you touch this area:** <what to watch for>
+```
+
+### Open items
+
+_Add entries as you discover them._
+
+## Common gotchas
+
+_Non-obvious things that trip people up. Bootstrap seeds this; {{LEAD_NAME}} appends over time._

@@ -14,10 +14,7 @@
   },
 
   "agents": {
-    "richard":  { "role": "lead",   "slackUserId": "U0AQWPY46S2" },
-    "gilfoyle": { "role": "worker", "slackUserId": "U0ARSGYKX1P" },
-    "dinesh":   { "role": "worker", "slackUserId": "U0ARUH9KU3F" },
-    "jared":    { "role": "qa",     "slackUserId": "U0ARGDK06J3" }
+    "richard":  { "role": "lead",   "slackUserId": "U0AQWPY46S2" }
   },
 
   "slack": {

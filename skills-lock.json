@@ -10,16 +10,6 @@
       "source": "yarn-rp/stask",
       "sourceType": "github",
       "computedHash": "166385f5f7bbdd6d12144887679b0f23c73b596a0668e79c0f43926fa92cc0a4"
-    },
-    "stask-qa": {
-      "source": "yarn-rp/stask",
-      "sourceType": "github",
-      "computedHash": "977e3ecdb90bae5486009ab5b39a764e13cc240944e025d7af565f0499fabf3c"
-    },
-    "stask-worker": {
-      "source": "yarn-rp/stask",
-      "sourceType": "github",
-      "computedHash": "7b0d77666ab92f1d6b30e704d0066e58b353c21fdd5ba3dbb84ef9b8421e7f7f"
     }
   }
 }

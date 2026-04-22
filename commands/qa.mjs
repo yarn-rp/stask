@@ -11,7 +11,7 @@ import { execSync } from 'child_process';
 import { CONFIG, getWorkspaceLibs } from '../lib/env.mjs';
 import { withTransaction } from '../lib/tx.mjs';
 import { syncTaskToSlack } from '../lib/slack-row.mjs';
-import { getAutoAssign, getLeadAgent } from '../lib/roles.mjs';
+import { getAutoAssign, getLeadAgent, getHuman } from '../lib/roles.mjs';
 import { postThreadUpdate } from '../lib/thread-notify.mjs';
 
 const TRIGGER_SQL = `
@@ -123,8 +123,8 @@ export async function run(argv) {
     updates[`qa_report_${currentFailCount + 1}`] = reportRef;
     updates.qa_fail_count = currentFailCount + 1;
     newStatus = 'Blocked';
-    newAssignee = CONFIG.human.name;
-    console.error(`QA failed ${currentFailCount + 1} times. Escalating to ${CONFIG.human.name}.`);
+    newAssignee = getHuman();
+    console.error(`QA failed ${currentFailCount + 1} times. Escalating to ${getHuman()}.`);
   } else {
     updates[`qa_report_${currentFailCount + 1}`] = reportRef;
     updates.qa_fail_count = currentFailCount + 1;

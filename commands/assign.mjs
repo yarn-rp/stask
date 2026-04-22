@@ -9,7 +9,7 @@
  */
 
 import { CONFIG, getWorkspaceLibs } from '../lib/env.mjs';
-import { getSlackUserId } from '../lib/roles.mjs';
+import { getSlackUserId, getHuman } from '../lib/roles.mjs';
 import { syncTaskToSlack, getSlackRowId } from '../lib/slack-row.mjs';
 import { postThreadUpdate } from '../lib/thread-notify.mjs';
 import { withTransaction } from '../lib/tx.mjs';
@@ -23,7 +23,7 @@ export async function run(argv) {
     console.error('Usage: stask assign <task-id> <name>');
     console.error('');
     console.error('Available names:');
-    console.error(`  ${CONFIG.human.name} (human)`);
+    console.error(`  ${getHuman()} (human)`);
     for (const [agent, info] of Object.entries(CONFIG.agents)) {
       console.error(`  ${agent.charAt(0).toUpperCase() + agent.slice(1)} (${info.role})`);
     }
@@ -43,7 +43,7 @@ export async function run(argv) {
   const displayName = name.charAt(0).toUpperCase() + name.slice(1);
   const slackUserId = getSlackUserId(displayName);
   if (!slackUserId) {
-    console.error(`ERROR: Unknown user "${name}". Available: ${CONFIG.human.name}, ${Object.keys(CONFIG.agents).map(n => n.charAt(0).toUpperCase() + n.slice(1)).join(', ')}`);
+    console.error(`ERROR: Unknown user "${name}". Available: ${getHuman()}, ${Object.keys(CONFIG.agents).map(n => n.charAt(0).toUpperCase() + n.slice(1)).join(', ')}`);
     process.exit(1);
   }
 

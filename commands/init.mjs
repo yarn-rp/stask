@@ -44,10 +44,7 @@ const CONFIG_TEMPLATE = (name, specsDir, worktreeBaseDir, staskDefaults) => ({
   },
 
   agents: {
-    'lead-agent':  { role: 'lead',   slackUserId: 'UXXXXXXXXXX' },
-    'worker-1':    { role: 'worker', slackUserId: 'UXXXXXXXXXX' },
-    'worker-2':    { role: 'worker', slackUserId: 'UXXXXXXXXXX' },
-    'qa-agent':    { role: 'qa',     slackUserId: 'UXXXXXXXXXX' },
+    'project-agent': { role: 'lead', slackUserId: 'UXXXXXXXXXX' },
   },
 
   slack: {

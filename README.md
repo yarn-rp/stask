@@ -75,10 +75,8 @@ stask transition T-001 "Ready for Human Review"
 
 The `skills/` folder contains role-specific documentation for AI agents:
 
-- **`skills/stask-general.md`** — Full framework overview, lifecycle, guards, CLI reference
-- **`skills/stask-lead.md`** — Lead agent workflow and decision trees
-- **`skills/stask-worker.md`** — Worker agent workflow and worktree rules
-- **`skills/stask-qa.md`** — QA agent testing workflow and report format
+- **`skills/stask-general/SKILL.md`** — Full framework overview, lifecycle, guards, CLI reference
+- **`skills/stask-lead/SKILL.md`** — Solo project-agent workflow (three acpx sessions per task, phase loop, QA gate, PR review)
 
 Add the relevant skill file to your agent's context to teach it the stask workflow.
 

@@ -1,38 +1,38 @@
 /**
  * roles.test.mjs — Role-based auto-assignment from config.
  *
- * Tests that auto-assign rules map statuses to the correct agents
- * based on their roles in config.json.
+ * Solo-agent projects: auto-assign resolves to human or lead only.
  */
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-// We import roles directly — it reads from config.json
-import { getAutoAssign, getLeadAgent, getAgentByRole, getSlackUserId, isHumanReviewStatus } from '../lib/roles.mjs';
+import { getAutoAssign, getLeadAgent, getAgentByRole, getHuman, getSlackUserId, isHumanReviewStatus } from '../lib/roles.mjs';
 import { CONFIG } from '../lib/env.mjs';
 
 describe('getAutoAssign', () => {
+  it('Backlog assigns to human', () => {
+    assert.equal(getAutoAssign('Backlog'), getHuman());
+  });
+
   it('To-Do assigns to human', () => {
-    assert.equal(getAutoAssign('To-Do'), CONFIG.human.name);
+    assert.equal(getAutoAssign('To-Do'), getHuman());
   });
 
   it('In-Progress assigns to lead agent', () => {
-    assert.equal(getAutoAssign('In-Progress'), getAgentByRole('lead'));
+    assert.equal(getAutoAssign('In-Progress'), getLeadAgent());
   });
 
-  it('Testing assigns to QA agent', () => {
-    const qaAgent = getAgentByRole('qa');
-    assert.equal(getAutoAssign('Testing'), qaAgent);
-    assert.ok(qaAgent, 'QA agent should exist in config');
+  it('Testing assigns to lead agent', () => {
+    assert.equal(getAutoAssign('Testing'), getLeadAgent());
   });
 
-  it('Ready for Human Review keeps current (null)', () => {
-    assert.equal(getAutoAssign('Ready for Human Review'), null);
+  it('Ready for Human Review assigns to human', () => {
+    assert.equal(getAutoAssign('Ready for Human Review'), getHuman());
   });
 
   it('Blocked assigns to human', () => {
-    assert.equal(getAutoAssign('Blocked'), CONFIG.human.name);
+    assert.equal(getAutoAssign('Blocked'), getHuman());
   });
 
   it('Done keeps current (null)', () => {
@@ -40,11 +40,16 @@ describe('getAutoAssign', () => {
   });
 });
 
+describe('getHuman', () => {
+  it('returns the human display name from config', () => {
+    assert.equal(getHuman(), CONFIG.human.name);
+  });
+});
+
 describe('getLeadAgent', () => {
   it('returns the agent with role "lead"', () => {
     const lead = getLeadAgent();
     assert.ok(lead, 'Lead agent should exist');
-    // Verify it matches a real agent in config
     const lowerLead = lead.toLowerCase();
     assert.ok(CONFIG.agents[lowerLead], `${lead} should be in config.agents`);
     assert.equal(CONFIG.agents[lowerLead].role, 'lead');
@@ -55,16 +60,6 @@ describe('getAgentByRole', () => {
   it('finds lead agent', () => {
     const lead = getAgentByRole('lead');
     assert.ok(lead);
-  });
-
-  it('finds worker agent', () => {
-    const worker = getAgentByRole('worker');
-    assert.ok(worker);
-  });
-
-  it('finds qa agent', () => {
-    const qa = getAgentByRole('qa');
-    assert.ok(qa);
   });
 
   it('returns null for unknown role', () => {

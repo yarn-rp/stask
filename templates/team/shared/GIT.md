@@ -37,18 +37,17 @@ Keep commits atomic — one logical change per commit.
 1. PR title matches commit style
 2. Description includes: what, why, how to test
 3. Must pass type check + lint
-4. Must have {{QA_NAME}}'s review
-5. {{LEAD_NAME}} gives final approval before merge
+4. Must have a QA PASS verdict from the `<T>:qa` acpx session (captured by `stask qa`)
+5. {{HUMAN_NAME}} reviews on GitHub before merge
 
 ## Who Can Merge
 
-- {{LEAD_NAME}} merges after {{QA_NAME}} approves
-- Only {{LEAD_NAME}} or {{HUMAN_NAME}} merge to `main`
-- No agent merges directly to `main`
+- Only {{HUMAN_NAME}} merges to `main`
+- {{LEAD_NAME}} never merges PRs; the task auto-transitions to Done when {{HUMAN_NAME}} merges
 
 ## Migration Safety
 
 - Never run migrations directly in production
 - Always test locally first
-- {{QA_NAME}} reviews migration SQL before it runs anywhere
+- {{LEAD_NAME}} reviews migration SQL inside `<T>:qa` before it runs anywhere
 - Migrations are irreversible — get it right the first time

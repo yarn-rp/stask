@@ -135,7 +135,8 @@ The PR description is what humans see first. Make it count.`;
       if (action && prompt) {
         const threadRef = getThreadRef(db, isSubtask ? task['Parent'] : taskId);
         const thread = threadRef ? { channelId: threadRef.channelId, threadTs: threadRef.threadTs } : null;
-        pendingTasks.push({ taskId, taskName: task['Task Name'], status, parent: task['Parent'], specFileId, action, prompt, thread });
+        const worktree = wt ? { path: wt.path, branch: wt.branch } : null;
+        pendingTasks.push({ taskId, taskName: task['Task Name'], status, parent: task['Parent'], specFileId, action, prompt, thread, worktree });
       }
     }
 

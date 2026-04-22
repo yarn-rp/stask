@@ -106,17 +106,11 @@ describe('setupCronJobs (openclaw CLI)', () => {
 
   const BASE_MANIFESTS = {
     lead: { role: 'lead', cron: { heartbeat: '*/5 * * * *' } },
-    backend: { role: 'backend' },
-    qa: { role: 'qa' },
   };
 
-  it('emits a cron job only for agents with cron.heartbeat', async () => {
+  it('emits a cron job for the single lead agent', async () => {
     buildStub();
-    const agents = [
-      ['professor', { role: 'lead' }],
-      ['berlin', { role: 'worker' }],
-      ['helsinki', { role: 'qa' }],
-    ];
+    const agents = [['professor', { role: 'lead' }]];
     const res = await freshSetup(agents, BASE_MANIFESTS);
     assert.deepEqual(res.created.sort(), ['professor-heartbeat']);
     assert.deepEqual(res.removed, []);
@@ -136,7 +130,7 @@ describe('setupCronJobs (openclaw CLI)', () => {
     assert.match(message, /acpx/);
   });
 
-  it('garbage-collects worker/qa heartbeat jobs left over from the old model', async () => {
+  it('garbage-collects worker/qa heartbeat jobs left over from the old multi-agent model', async () => {
     writeStubState({
       jobs: [
         { id: 'a', name: 'professor-heartbeat', schedule: { expr: '0,20,40 * * * *' }, agentId: 'professor' },
@@ -147,11 +141,8 @@ describe('setupCronJobs (openclaw CLI)', () => {
     });
     buildStub();
 
-    const agents = [
-      ['professor', { role: 'lead' }],
-      ['berlin', { role: 'worker' }],
-      ['helsinki', { role: 'qa' }],
-    ];
+    // Current config has collapsed to a single lead; old worker/qa crons must be removed.
+    const agents = [['professor', { role: 'lead' }]];
     const res = await freshSetup(agents, BASE_MANIFESTS);
 
     assert.deepEqual(res.removed.sort(), ['berlin-heartbeat', 'helsinki-heartbeat']);
@@ -198,7 +189,7 @@ describe('setupCronJobs (openclaw CLI)', () => {
 
   it('skips heartbeat job when lead manifest has no cron.heartbeat', async () => {
     buildStub();
-    const manifests = { lead: { role: 'lead' }, backend: { role: 'backend' }, qa: { role: 'qa' } };
+    const manifests = { lead: { role: 'lead' } };
     const agents = [['professor', { role: 'lead' }]];
     const res = await freshSetup(agents, manifests);
     assert.deepEqual(res.created, []);

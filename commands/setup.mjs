@@ -599,7 +599,7 @@ async function runPartial({ onlySteps, detectedRepoPath }) {
   if (onlySteps.has('welcome'))  await stepWelcome(s, ctx);
 
   if (onlySteps.has('skills')) {
-    const agentRoles = Object.entries(staskConfig.agents || {}).map(([name, cfg]) => ({ name, role: cfg.role === 'worker' ? 'backend' : cfg.role }));
+    const agentRoles = Object.entries(staskConfig.agents || {}).map(([name, cfg]) => ({ name, role: cfg.role }));
     await stepSkills(s, ctx, agentRoles, { teamManifest: TEAM_MANIFEST, agentManifests: AGENT_MANIFESTS });
   }
 

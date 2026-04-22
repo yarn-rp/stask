@@ -81,26 +81,15 @@ describe('Config-driven Slack mappings', () => {
     }
   });
 
-  it('all agents have valid roles', () => {
-    const validRoles = ['lead', 'worker', 'qa'];
+  it('all agents have the lead role (solo-agent project)', () => {
     for (const [name, agent] of Object.entries(CONFIG.agents)) {
-      assert.ok(validRoles.includes(agent.role), `Agent "${name}" has invalid role "${agent.role}"`);
+      assert.equal(agent.role, 'lead', `Agent "${name}" should have role "lead", got "${agent.role}"`);
     }
   });
 
   it('exactly one lead agent', () => {
     const leads = Object.entries(CONFIG.agents).filter(([, a]) => a.role === 'lead');
     assert.equal(leads.length, 1, 'Should have exactly one lead agent');
-  });
-
-  it('exactly one QA agent', () => {
-    const qas = Object.entries(CONFIG.agents).filter(([, a]) => a.role === 'qa');
-    assert.equal(qas.length, 1, 'Should have exactly one QA agent');
-  });
-
-  it('at least one worker agent', () => {
-    const workers = Object.entries(CONFIG.agents).filter(([, a]) => a.role === 'worker');
-    assert.ok(workers.length >= 1, 'Should have at least one worker agent');
   });
 });
 

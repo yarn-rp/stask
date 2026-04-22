@@ -10,7 +10,6 @@
   "openclaw": {
     "compaction": { "mode": "safeguard" },
     "maxConcurrent": 4,
-    "subagents": { "maxConcurrent": 8 },
     "memorySearch": { "provider": "ollama" }
   },
 

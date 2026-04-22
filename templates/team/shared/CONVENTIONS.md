@@ -23,5 +23,5 @@ _Document naming conventions for files, components, types, etc._
 - **Workflow:** Always `git pull origin main` → `git checkout -b <branch>` → `git add .` → `git commit` → `git push origin <branch>` → `gh pr create`.
 - **Pre-Push Build:** Never push or merge a branch unless `npm run build` succeeds locally with **zero** errors.
 - **Environment Check:** Always run `npm install` after a pull to ensure `node_modules` are in sync.
-- Every non-trivial change goes through {{QA_NAME}}'s review
-- DB migrations require {{QA_NAME}} sign-off before running
+- Every non-trivial change is verified in a fresh `<T>:qa` acpx session before it reaches PR
+- DB migrations are reviewed inside `<T>:qa` before running in any environment

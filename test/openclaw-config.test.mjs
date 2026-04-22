@@ -167,8 +167,9 @@ describe('registerAgents (openclaw CLI)', () => {
 
     const calls = readLog();
     const configSets = calls.filter(c => c.cmd === 'config' && c.sub === 'set');
-    // 4 writes per account (allowFrom, dmPolicy, groupPolicy, execApprovals) * 3 accounts = 12.
-    assert.equal(configSets.length, 12);
+    // Slack trust: 4 writes per account * 3 accounts = 12.
+    // acpx plugin bootstrap: 3 writes (enabled, permissionMode, nonInteractivePermissions).
+    assert.equal(configSets.length, 12 + 3);
 
     // Verify professor's allowFrom carries the human user id.
     const profAllowFrom = configSets.find(c =>
@@ -193,7 +194,10 @@ describe('registerAgents (openclaw CLI)', () => {
       slackAccounts: SLACK,
     });
     const calls = readLog();
-    assert.equal(calls.filter(c => c.cmd === 'config' && c.sub === 'set').length, 0);
+    // Only the 3 acpx plugin bootstrap writes; no per-account trust policy writes.
+    const configSets = calls.filter(c => c.cmd === 'config' && c.sub === 'set');
+    assert.equal(configSets.length, 3);
+    assert.ok(configSets.every(c => c.args[2].startsWith('plugins.entries.acpx.')));
   });
 
   it('skips agents that already exist; bindings still ensured via agents bind', async () => {

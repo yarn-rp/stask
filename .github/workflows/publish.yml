@@ -33,6 +33,9 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Pull any commits that landed on main between checkout and now so
+          # the version bump commit cleanly fast-forwards on push.
+          git pull --rebase origin main
           npm version patch -m "chore: release v%s"
           git push --follow-tags
 

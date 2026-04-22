@@ -17,7 +17,7 @@ import {
 import { scaffoldWorkspace, seedWorkspaceState } from '../lib/setup/template.mjs';
 import { loadSetupState, saveSetupState, clearSetupState, createState, completeStep, isStepDone } from '../lib/setup/state.mjs';
 import { verifyToken } from '../lib/setup/slack-manifest.mjs';
-import { createAgentDir, getAgentDirPath } from '../lib/setup/agent-dir.mjs';
+import { getAgentDirPath } from '../lib/setup/agent-dir.mjs';
 import { writeSlackIdsToConfig } from '../lib/setup/slack-list.mjs';
 import { registerAgents } from '../lib/setup/openclaw-config.mjs';
 import { setupCronJobs } from '../lib/setup/cron-setup.mjs';
@@ -29,7 +29,7 @@ import { configGet, readRawSecret } from '../lib/setup/openclaw-cli.mjs';
 // Shared step functions — used by both full wizard and --only partial mode
 import {
   stepChannel, stepList, stepCanvas, stepBookmarks, stepWelcome,
-  stepSkills, stepCron, stepOpenclaw, stepVerify, stepInbox,
+  stepSkills, stepCron, stepOpenclaw, stepInstall, stepInbox,
   buildContext, getWorkspaceInfo,
 } from '../lib/setup/steps.mjs';
 
@@ -37,7 +37,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATE_DIR = path.resolve(__dirname, '../templates/team');
 const OPENCLAW_HOME = path.join(process.env.HOME || '', '.openclaw');
 
-const STEPS = ['Project', 'Team', 'Models', 'Build', 'Slack Apps', 'Slack Setup', 'Register', 'Verify'];
+const STEPS = ['Project', 'Team', 'Models', 'Build', 'Slack Apps', 'Slack Setup', 'Register', 'Install'];
 
 // Load manifests from template directory — the source of truth for team config
 const { team: TEAM_MANIFEST, agents: AGENT_MANIFESTS } = loadManifests(TEMPLATE_DIR);
@@ -216,9 +216,8 @@ export async function run(args) {
     }
     s.stop(`${pc.bold(wsResult.filesCreated)} workspace files created`);
 
-    s.start('Creating agent directories...');
-    for (const role of ROLES) createAgentDir(d.agents[role.id].name);
-    s.stop('Agent directories ready');
+    // Agent directories + models.json are created later by `openclaw agents add`
+    // in stepOpenclaw; no pre-creation needed here.
 
     // Skills — pass manifests so skills.mjs reads from them
     const skillAgents = ROLES.map(role => ({ name: d.agents[role.id].name, role: role.id }));
@@ -467,19 +466,19 @@ export async function run(args) {
     completeStep(state, 'register');
   }
 
-  // ═══ PHASE 7 — Verify ═══
+  // ═══ PHASE 7 — Install ═══
   phase(7);
-  log.info(pc.dim('Running verification checks...\n'));
+  log.info(pc.dim('Running install verification checks...\n'));
 
-  const verifyCtx = buildContext({
+  const installCtx = buildContext({
     staskConfig: { agents: {}, human: {}, slack: { listId: d.slackListId, channelId: d.slackChannelId } },
     slug: d.projectSlug, repoPath: d.repoPath, leadToken: '',
   });
-  verifyCtx.canvasId = d.canvasId;
-  // Reload agents for verify
+  installCtx.canvasId = d.canvasId;
+  // Reload agents for install checks
   const leadName = d.leadName;
-  verifyCtx.agents[d.leadName] = { role: 'lead' };
-  stepVerify(verifyCtx);
+  installCtx.agents[d.leadName] = { role: 'lead' };
+  stepInstall(installCtx);
 
   // OpenClaw restart
   console.log('');
@@ -568,7 +567,7 @@ async function runPartial({ onlySteps, detectedRepoPath }) {
   log.info(`Steps: ${pc.cyan([...onlySteps].join(', '))}\n`);
 
   // Validate onlySteps - add 'inbox' to valid steps
-  const validSteps = ['channel', 'list', 'canvas', 'bookmark', 'welcome', 'skills', 'cron', 'openclaw', 'verify', 'inbox'];
+  const validSteps = ['channel', 'list', 'canvas', 'bookmark', 'welcome', 'skills', 'cron', 'openclaw', 'install', 'inbox'];
   const invalidSteps = [...onlySteps].filter(s => !validSteps.includes(s));
   if (invalidSteps.length > 0) {
     log.error(`Invalid step(s): ${invalidSteps.join(', ')}`);
@@ -590,7 +589,7 @@ async function runPartial({ onlySteps, detectedRepoPath }) {
 
   if (onlySteps.has('cron'))     await stepCron(s, ctx, AGENT_MANIFESTS);
   if (onlySteps.has('openclaw')) await stepOpenclaw(s, ctx, null, TEAM_MANIFEST);
-  if (onlySteps.has('verify'))   stepVerify(ctx);
+  if (onlySteps.has('install'))  stepInstall(ctx);
   if (onlySteps.has('inbox'))    await stepInbox(s, ctx);
 
   outro(pc.green('Done'));

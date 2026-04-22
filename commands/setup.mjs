@@ -415,7 +415,20 @@ export async function run(args) {
 
     await stepOpenclaw(s, regCtx, agentModels, TEAM_MANIFEST, d.slackAccounts);
     await stepCron(s, regCtx, AGENT_MANIFESTS);
-    await stepClaudeSubagents(s, regCtx, { projectName: d.projectName, humanName: d.humanName });
+
+    // Pass manifest roleIds (lead/backend/frontend/qa) — the Claude skill
+    // list is keyed by manifest role, not the stask role (worker collapses
+    // backend+frontend).
+    const claudeAgentRoles = ROLES.map((role) => ({
+      name: d.agents[role.id].name,
+      roleId: role.id,
+    }));
+    await stepClaudeSubagents(s, regCtx, {
+      projectName: d.projectName,
+      humanName: d.humanName,
+      manifests: { teamManifest: TEAM_MANIFEST, agentManifests: AGENT_MANIFESTS },
+      agentRoles: claudeAgentRoles,
+    });
 
     // stask project init
     s.start('Initializing stask project...');
@@ -592,7 +605,27 @@ async function runPartial({ onlySteps, detectedRepoPath }) {
   if (onlySteps.has('openclaw')) await stepOpenclaw(s, ctx, null, TEAM_MANIFEST);
   if (onlySteps.has('install'))  stepInstall(ctx);
   if (onlySteps.has('inbox'))    await stepInbox(s, ctx);
-  if (onlySteps.has('claude'))   await stepClaudeSubagents(s, ctx, { projectName: slug, humanName: staskConfig.human?.name });
+  if (onlySteps.has('claude')) {
+    // Partial mode: .stask/config.json stores the stask role (lead/worker/qa),
+    // which loses the backend vs frontend distinction. Infer manifest roleId
+    // by matching agent name to the full-setup naming, or fall back to a
+    // worker → backend mapping. If the user has a more specific preference,
+    // they can rerun full setup.
+    const agentRoles = Object.entries(staskConfig.agents || {}).map(([name, cfg]) => {
+      if (cfg.role === 'lead') return { name, roleId: 'lead' };
+      if (cfg.role === 'qa') return { name, roleId: 'qa' };
+      // stask 'worker' collapses backend/frontend — try to detect by name, else default to backend.
+      const lc = name.toLowerCase();
+      if (lc.includes('front') || lc.includes('ui') || lc.includes('design')) return { name, roleId: 'frontend' };
+      return { name, roleId: 'backend' };
+    });
+    await stepClaudeSubagents(s, ctx, {
+      projectName: slug,
+      humanName: staskConfig.human?.name,
+      manifests: { teamManifest: TEAM_MANIFEST, agentManifests: AGENT_MANIFESTS },
+      agentRoles,
+    });
+  }
 
   outro(pc.green('Done'));
 }

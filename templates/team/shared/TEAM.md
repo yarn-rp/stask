@@ -2,21 +2,21 @@
 
 ## The Crew
 
-| Agent | Role | OpenCode Model | Workspace |
-|-------|------|----------------|-----------|
-| **{{LEAD_NAME}}** 🧠 | Tech Lead — plans, specs, delegates, reviews | `{{LEAD_MODEL}}` | `{{LEAD_NAME_LOWER}}/` |
-| **{{BACKEND_NAME}}** 🔒 | Backend Engineer — API, DB, auth, infra | `{{BACKEND_MODEL}}` | `{{BACKEND_NAME_LOWER}}/` |
-| **{{FRONTEND_NAME}}** 🎨 | Frontend Engineer — pages, components, styling | `{{FRONTEND_MODEL}}` | `{{FRONTEND_NAME_LOWER}}/` |
-| **{{QA_NAME}}** 🧪 | QA Engineer — browser tests, API tests, reports | `{{QA_MODEL}}` | `{{QA_NAME_LOWER}}/` |
+| Agent | Role | Claude Subagent | Workspace |
+|-------|------|-----------------|-----------|
+| **{{LEAD_NAME}}** 🧠 | Tech Lead — plans, specs, delegates, reviews | `{{LEAD_NAME_LOWER}}` | `{{LEAD_NAME_LOWER}}/` |
+| **{{BACKEND_NAME}}** 🔒 | Backend Engineer — API, DB, auth, infra | `{{BACKEND_NAME_LOWER}}` | `{{BACKEND_NAME_LOWER}}/` |
+| **{{FRONTEND_NAME}}** 🎨 | Frontend Engineer — pages, components, styling | `{{FRONTEND_NAME_LOWER}}` | `{{FRONTEND_NAME_LOWER}}/` |
+| **{{QA_NAME}}** 🧪 | QA Engineer — browser tests, API tests, reports | `{{QA_NAME_LOWER}}` | `{{QA_NAME_LOWER}}/` |
 
-> **Architecture:** All agents orchestrate via OpenClaw and spawn **OpenCode sessions** with skills attached via `-f` for actual code execution and testing. Agents orchestrate and review; OpenCode executes.
+> **Architecture:** All agents orchestrate via OpenClaw and spawn **Claude Code sessions** via `claude --agent <name>` for actual code execution and testing. Each agent's role playbook is preloaded from `{{PROJECT_ROOT}}/.claude/agents/<name>.md`, so every session starts already knowing the agent's identity, skills, and conventions. Agents orchestrate and review; Claude Code executes.
 
 ## Task Flow
 
 ```
 {{HUMAN_NAME}} → {{LEAD_NAME}} (plan + spec with Acceptance Criteria)
-        → {{BACKEND_NAME}} / {{FRONTEND_NAME}} (build + own unit tests, via OpenCode)
-            → {{QA_NAME}} (QA: browser + API tests against ACs, via OpenCode)
+        → {{BACKEND_NAME}} / {{FRONTEND_NAME}} (build + own unit tests, via Claude Code)
+            → {{QA_NAME}} (QA: browser + API tests against ACs, via Claude Code)
                 → {{LEAD_NAME}} (code review + QA report review)
                     → {{HUMAN_NAME}} (human review — QA screenshots + reports synced to Slack)
 ```

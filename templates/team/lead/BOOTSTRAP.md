@@ -17,32 +17,30 @@ sessions_spawn({
   agentId: "{{BACKEND_NAME_LOWER}}",
   cwd: "{{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{BACKEND_NAME_LOWER}}",
   runtime: "subagent",
-  task: "BOOTSTRAP EXPLORATION: Read your BOOTSTRAP.md. Explore the backend of {{PROJECT_ROOT}} via OpenCode. Write all findings to ../shared/artifacts/bootstrap-backend.md. Do NOT ask the human any questions — just explore and document."
+  task: "BOOTSTRAP EXPLORATION: Read your BOOTSTRAP.md. Explore the backend of {{PROJECT_ROOT}} via Claude Code. Write all findings to ../shared/artifacts/bootstrap-backend.md. Do NOT ask the human any questions — just explore and document."
 })
 
 sessions_spawn({
   agentId: "{{FRONTEND_NAME_LOWER}}",
   cwd: "{{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{FRONTEND_NAME_LOWER}}",
   runtime: "subagent",
-  task: "BOOTSTRAP EXPLORATION: Read your BOOTSTRAP.md. Explore the frontend of {{PROJECT_ROOT}} via OpenCode. Write all findings to ../shared/artifacts/bootstrap-frontend.md. Do NOT ask the human any questions — just explore and document."
+  task: "BOOTSTRAP EXPLORATION: Read your BOOTSTRAP.md. Explore the frontend of {{PROJECT_ROOT}} via Claude Code. Write all findings to ../shared/artifacts/bootstrap-frontend.md. Do NOT ask the human any questions — just explore and document."
 })
 
 sessions_spawn({
   agentId: "{{QA_NAME_LOWER}}",
   cwd: "{{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{QA_NAME_LOWER}}",
   runtime: "subagent",
-  task: "BOOTSTRAP EXPLORATION: Read your BOOTSTRAP.md. Explore the project at {{PROJECT_ROOT}} from a QA perspective via OpenCode. Try to run the project. Write all findings to ../shared/artifacts/bootstrap-qa.md. Do NOT ask the human any questions — just explore and document."
+  task: "BOOTSTRAP EXPLORATION: Read your BOOTSTRAP.md. Explore the project at {{PROJECT_ROOT}} from a QA perspective via Claude Code. Try to run the project. Write all findings to ../shared/artifacts/bootstrap-qa.md. Do NOT ask the human any questions — just explore and document."
 })
 ```
 
 ### Self-explore (in parallel with the team)
 
-While the team explores, do your own high-level scan via OpenCode:
+While the team explores, do your own high-level scan via Claude Code:
 
 ```bash
-cd {{PROJECT_ROOT}} && opencode run -m {{LEAD_MODEL}} \
-  -f {{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{LEAD_NAME_LOWER}}/skills/gsd/SKILL.md \
-  -- 'Map the project at {{PROJECT_ROOT}}. Give me:
+cd {{PROJECT_ROOT}} && claude --agent {{LEAD_NAME_LOWER}} -p 'Map the project at {{PROJECT_ROOT}}. Give me:
   1. Project overview (README, package.json, what this project does)
   2. Directory structure — what lives where
   3. Tech stack — frameworks, database, auth, payments, deployment

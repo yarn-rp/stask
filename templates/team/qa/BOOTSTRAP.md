@@ -4,18 +4,16 @@ _Spawned by {{LEAD_NAME}} for exploration. Delete when done._
 
 ## Your Task: Autonomous QA Exploration + Verify the Project Runs
 
-{{LEAD_NAME}} spawned you to explore the project from a QA perspective. **Do NOT ask the human any questions.** Explore the codebase via OpenCode, try to run the project, write your findings to `../shared/artifacts/bootstrap-qa.md`, then terminate.
+{{LEAD_NAME}} spawned you to explore the project from a QA perspective. **Do NOT ask the human any questions.** Explore the codebase via Claude Code, try to run the project, write your findings to `../shared/artifacts/bootstrap-qa.md`, then terminate.
 
 The human will review your findings later with {{LEAD_NAME}}. If you have questions, write them into your artifact — don't ask them live.
 
 ## Phase 1: Try to Run the Project
 
-Before exploring test infrastructure, verify the project can actually run. Read the project README and any `../shared/DEV.md` Lead may have written. Try to start the project via OpenCode:
+Before exploring test infrastructure, verify the project can actually run. Read the project README and any `../shared/DEV.md` Lead may have written. Try to start the project via Claude Code:
 
 ```bash
-cd {{PROJECT_ROOT}} && opencode run -m {{QA_MODEL}} \
-  -f {{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{QA_NAME_LOWER}}/skills/qa-patrol/SKILL.md \
-  -- 'Try to run the project at {{PROJECT_ROOT}}:
+cd {{PROJECT_ROOT}} && claude --agent {{QA_NAME_LOWER}} -p 'Try to run the project at {{PROJECT_ROOT}}:
   1. Read the README and package.json scripts
   2. Identify the dev server command
   3. Identify environment requirements (.env.example, .env.local, required services)
@@ -28,12 +26,10 @@ cd {{PROJECT_ROOT}} && opencode run -m {{QA_MODEL}} \
 
 Record whether you could run it and any blockers. This is critical — you cannot test what you cannot run.
 
-## Phase 2: Explore Test Infrastructure via OpenCode
+## Phase 2: Explore Test Infrastructure via Claude Code
 
 ```bash
-cd {{PROJECT_ROOT}} && opencode run -m {{QA_MODEL}} \
-  -f {{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{QA_NAME_LOWER}}/skills/qa-patrol/SKILL.md \
-  -- 'QA analysis of {{PROJECT_ROOT}}. Map:
+cd {{PROJECT_ROOT}} && claude --agent {{QA_NAME_LOWER}} -p 'QA analysis of {{PROJECT_ROOT}}. Map:
 
   1. Existing test files: Playwright, Cypress, Jest, Vitest — list test directories and test types.
   2. Test scripts in package.json: how to run each type of test.

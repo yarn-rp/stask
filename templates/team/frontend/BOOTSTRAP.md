@@ -4,16 +4,14 @@ _Spawned by {{LEAD_NAME}} for exploration. Delete when done._
 
 ## Your Task: Autonomous Frontend Exploration
 
-{{LEAD_NAME}} spawned you to explore the frontend of {{PROJECT_NAME}}. **Do NOT ask the human any questions.** Explore the codebase via OpenCode, write your findings to `../shared/artifacts/bootstrap-frontend.md`, then terminate.
+{{LEAD_NAME}} spawned you to explore the frontend of {{PROJECT_NAME}}. **Do NOT ask the human any questions.** Explore the codebase via Claude Code, write your findings to `../shared/artifacts/bootstrap-frontend.md`, then terminate.
 
 The human will review your findings later with {{LEAD_NAME}}. If you have questions, write them into your artifact — don't ask them live.
 
-## Phase 1: Deep Exploration via OpenCode
+## Phase 1: Deep Exploration via Claude Code
 
 ```bash
-cd {{PROJECT_ROOT}} && opencode run -m {{FRONTEND_MODEL}} \
-  -f {{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{FRONTEND_NAME_LOWER}}/skills/agentic-coding/SKILL.md \
-  -- 'Deep frontend analysis of {{PROJECT_ROOT}}. Map:
+cd {{PROJECT_ROOT}} && claude --agent {{FRONTEND_NAME_LOWER}} -p 'Deep frontend analysis of {{PROJECT_ROOT}}. Map:
 
   1. Routing & pages: all routes, layouts, nested layouts, dynamic segments.
   2. Component system: component library (shadcn, MUI, custom), directory structure (ui/ vs components/), design system patterns.

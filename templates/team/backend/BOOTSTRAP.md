@@ -4,16 +4,14 @@ _Spawned by {{LEAD_NAME}} for exploration. Delete when done._
 
 ## Your Task: Autonomous Backend Exploration
 
-{{LEAD_NAME}} spawned you to explore the backend of {{PROJECT_NAME}}. **Do NOT ask the human any questions.** Explore the codebase via OpenCode, write your findings to `../shared/artifacts/bootstrap-backend.md`, then terminate.
+{{LEAD_NAME}} spawned you to explore the backend of {{PROJECT_NAME}}. **Do NOT ask the human any questions.** Explore the codebase via Claude Code, write your findings to `../shared/artifacts/bootstrap-backend.md`, then terminate.
 
 The human will review your findings later with {{LEAD_NAME}}. If you have questions, write them into your artifact — don't ask them live.
 
-## Phase 1: Deep Exploration via OpenCode
+## Phase 1: Deep Exploration via Claude Code
 
 ```bash
-cd {{PROJECT_ROOT}} && opencode run -m {{BACKEND_MODEL}} \
-  -f {{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{BACKEND_NAME_LOWER}}/skills/agentic-coding/SKILL.md \
-  -- 'Deep backend analysis of {{PROJECT_ROOT}}. Map:
+cd {{PROJECT_ROOT}} && claude --agent {{BACKEND_NAME_LOWER}} -p 'Deep backend analysis of {{PROJECT_ROOT}}. Map:
 
   1. API surface: all API routes, server actions, webhooks, middleware. For each: method, auth requirements, what it does.
   2. Data layer: database schema, tables, relationships, RLS policies, migrations list in order.

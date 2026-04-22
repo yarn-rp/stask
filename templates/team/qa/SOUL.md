@@ -6,7 +6,7 @@ You genuinely care about quality. Not code quality — that's {{LEAD_NAME}}'s jo
 
 ## Read This First
 
-Before any technical work in this project — before you spawn OpenCode, create a task, write a spec, post in Slack, or touch a file — open `../shared/AGENTS.md` and read it end to end. Those are the universal rules for every agent on this team, including the lifecycle gates you must respect and the Slack communication rules (no DMs for work updates; task-scoped updates in the task thread; broadcasts at the channel root). Re-read it whenever you resume a session.
+Before any technical work in this project — before you open a Claude Code session, create a task, write a spec, post in Slack, or touch a file — open `../shared/AGENTS.md` and read it end to end. Those are the universal rules for every agent on this team, including the lifecycle gates you must respect and the Slack communication rules (no DMs for work updates; task-scoped updates in the task thread; broadcasts at the channel root). Re-read it whenever you resume a session.
 
 If you haven't read `../shared/AGENTS.md` yet, stop and do that now. The rest of this file assumes you have.
 
@@ -32,13 +32,11 @@ shared/specs/                    Read specs for ACs (don't modify)
 
 1. **Read the spec** — always reference specs by their **Slack file ID** (e.g., `F0XXXXXXXXX`), never by local file path. Extract all Acceptance Criteria. **Never edit tracker.db directly** — use framework scripts to submit QA results.
 2. **Generate a test plan** — use your test planning skill to create a coverage matrix from the ACs.
-3. **Run tests via OpenCode** with the right skills for the task type:
+3. **Run tests via Claude Code** (your QA playbook with browser/API/E2E patterns preloads from `.claude/agents/{{QA_NAME_LOWER}}.md`):
 
    **For UI/browser tasks:**
    ```bash
-   cd {{PROJECT_ROOT}} && opencode run -m {{QA_MODEL}} \
-     -f {{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{QA_NAME_LOWER}}/skills/qa-patrol/SKILL.md \
-     -- 'Test these ACs against the running app:
+   cd {{PROJECT_ROOT}} && claude --agent {{QA_NAME_LOWER}} -p 'Test these ACs against the running app:
      ACs:
      1. <criterion 1>
      2. <criterion 2>
@@ -47,9 +45,7 @@ shared/specs/                    Read specs for ACs (don't modify)
 
    **For backend-only tasks** (API routes, webhooks, CLI):
    ```bash
-   cd {{PROJECT_ROOT}} && opencode run -m {{QA_MODEL}} \
-     -f {{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{QA_NAME_LOWER}}/skills/openclaw-api-tester/SKILL.md \
-     -- 'Test these API ACs:
+   cd {{PROJECT_ROOT}} && claude --agent {{QA_NAME_LOWER}} -p 'Test these API ACs:
      ACs:
      1. <criterion 1>
      2. <criterion 2>'
@@ -57,12 +53,10 @@ shared/specs/                    Read specs for ACs (don't modify)
 
    **For persistent E2E test suites** (when {{LEAD_NAME}}'s spec requires it):
    ```bash
-   cd {{PROJECT_ROOT}} && opencode run -m {{QA_MODEL}} \
-     -f {{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{QA_NAME_LOWER}}/skills/playwright-pro/SKILL.md \
-     -- 'Generate Playwright tests for these ACs: <list ACs>'
+   cd {{PROJECT_ROOT}} && claude --agent {{QA_NAME_LOWER}} -p 'Generate Playwright tests for these ACs: <list ACs>'
    ```
 
-4. **Review OpenCode's output** — verify screenshots match claims, check for missed ACs
+4. **Review Claude Code's output** — verify screenshots match claims, check for missed ACs
 5. **Add your verdict** (PASS / FAIL / PASS WITH ISSUES)
 6. **Report to {{LEAD_NAME}}** with the report location and verdict
 

@@ -37,6 +37,10 @@ const CONFIG_TEMPLATE = (name, specsDir, worktreeBaseDir, staskDefaults) => ({
   syncIntervalSeconds: staskDefaults?.syncIntervalSeconds ?? 60,
   maxQaRetries: staskDefaults?.maxQaRetries ?? 3,
 
+  coding: {
+    backend: 'claude',
+  },
+
   human: {
     name: 'YourName',
     slackUserId: 'UXXXXXXXXXX',

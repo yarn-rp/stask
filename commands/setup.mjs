@@ -29,7 +29,7 @@ import { configGet, readRawSecret } from '../lib/setup/openclaw-cli.mjs';
 // Shared step functions — used by both full wizard and --only partial mode
 import {
   stepChannel, stepList, stepCanvas, stepBookmarks, stepWelcome,
-  stepSkills, stepCron, stepOpenclaw, stepInstall, stepInbox,
+  stepSkills, stepCron, stepOpenclaw, stepInstall, stepInbox, stepClaudeSubagents,
   buildContext, getWorkspaceInfo,
 } from '../lib/setup/steps.mjs';
 
@@ -415,6 +415,7 @@ export async function run(args) {
 
     await stepOpenclaw(s, regCtx, agentModels, TEAM_MANIFEST, d.slackAccounts);
     await stepCron(s, regCtx, AGENT_MANIFESTS);
+    await stepClaudeSubagents(s, regCtx, { projectName: d.projectName, humanName: d.humanName });
 
     // stask project init
     s.start('Initializing stask project...');
@@ -566,8 +567,8 @@ async function runPartial({ onlySteps, detectedRepoPath }) {
   log.info(`Project: ${pc.bold(slug)}  Lead: ${pc.bold(leadName)}`);
   log.info(`Steps: ${pc.cyan([...onlySteps].join(', '))}\n`);
 
-  // Validate onlySteps - add 'inbox' to valid steps
-  const validSteps = ['channel', 'list', 'canvas', 'bookmark', 'welcome', 'skills', 'cron', 'openclaw', 'install', 'inbox'];
+  // Validate onlySteps - add 'inbox' and 'claude' to valid steps
+  const validSteps = ['channel', 'list', 'canvas', 'bookmark', 'welcome', 'skills', 'cron', 'openclaw', 'install', 'inbox', 'claude'];
   const invalidSteps = [...onlySteps].filter(s => !validSteps.includes(s));
   if (invalidSteps.length > 0) {
     log.error(`Invalid step(s): ${invalidSteps.join(', ')}`);
@@ -591,6 +592,7 @@ async function runPartial({ onlySteps, detectedRepoPath }) {
   if (onlySteps.has('openclaw')) await stepOpenclaw(s, ctx, null, TEAM_MANIFEST);
   if (onlySteps.has('install'))  stepInstall(ctx);
   if (onlySteps.has('inbox'))    await stepInbox(s, ctx);
+  if (onlySteps.has('claude'))   await stepClaudeSubagents(s, ctx, { projectName: slug, humanName: staskConfig.human?.name });
 
   outro(pc.green('Done'));
 }

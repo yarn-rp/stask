@@ -10,8 +10,15 @@ The human will review your findings later with {{LEAD_NAME}}. If you have questi
 
 ## Phase 1: Deep Exploration via Claude Code
 
+(Full invocation recipe in `../shared/CLAUDE-CODING.md` — all flags mandatory for subsession use.)
+
 ```bash
-cd {{PROJECT_ROOT}} && claude --agent {{FRONTEND_NAME_LOWER}} -p 'Deep frontend analysis of {{PROJECT_ROOT}}. Map:
+cd {{PROJECT_ROOT}} && claude \
+  --agent {{FRONTEND_NAME_LOWER}} \
+  --permission-mode bypassPermissions \
+  --add-dir {{PROJECT_ROOT}} \
+  --output-format stream-json --verbose --include-partial-messages \
+  -p 'Deep frontend analysis of {{PROJECT_ROOT}}. Map:
 
   1. Routing & pages: all routes, layouts, nested layouts, dynamic segments.
   2. Component system: component library (shadcn, MUI, custom), directory structure (ui/ vs components/), design system patterns.

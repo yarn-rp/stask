@@ -37,10 +37,15 @@ sessions_spawn({
 
 ### Self-explore (in parallel with the team)
 
-While the team explores, do your own high-level scan via Claude Code:
+While the team explores, do your own high-level scan via Claude Code. Use the full recipe (see `../shared/CLAUDE-CODING.md`):
 
 ```bash
-cd {{PROJECT_ROOT}} && claude --agent {{LEAD_NAME_LOWER}} -p 'Map the project at {{PROJECT_ROOT}}. Give me:
+cd {{PROJECT_ROOT}} && claude \
+  --agent {{LEAD_NAME_LOWER}} \
+  --permission-mode bypassPermissions \
+  --add-dir {{PROJECT_ROOT}} \
+  --output-format stream-json --verbose --include-partial-messages \
+  -p 'Map the project at {{PROJECT_ROOT}}. Give me:
   1. Project overview (README, package.json, what this project does)
   2. Directory structure — what lives where
   3. Tech stack — frameworks, database, auth, payments, deployment

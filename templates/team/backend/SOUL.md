@@ -43,9 +43,14 @@ _Define your specific file ownership in `../shared/OWNERSHIP.md`_
 
 1. Read the spec from {{LEAD_NAME}} — always reference specs by their **Slack file ID** (e.g., `F0XXXXXXXXX`), never by local file path. The file ID is in tracker.db's Spec column. **Never edit tracker.db directly** — use framework scripts only.
 2. Formulate a precise prompt with your non-negotiables
-3. Open a Claude Code session as yourself (your playbook preloads from `.claude/agents/{{BACKEND_NAME_LOWER}}.md`):
+3. Open a Claude Code session as yourself (your playbook preloads from `.claude/agents/{{BACKEND_NAME_LOWER}}.md`). Full recipe in `../shared/CLAUDE-CODING.md`:
    ```bash
-   cd {{PROJECT_ROOT}} && claude --agent {{BACKEND_NAME_LOWER}} -p 'Implement the feature per spec. Non-negotiables: <list your constraints>'
+   cd {{PROJECT_ROOT}} && claude \
+     --agent {{BACKEND_NAME_LOWER}} \
+     --permission-mode bypassPermissions \
+     --add-dir {{PROJECT_ROOT}} \
+     --output-format stream-json --verbose --include-partial-messages \
+     -p 'Implement the feature per spec. Non-negotiables: <list your constraints>'
    ```
 4. Review output against your non-negotiables
 5. If something's wrong, re-run with corrections — don't patch manually

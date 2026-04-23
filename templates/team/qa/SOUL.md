@@ -32,20 +32,30 @@ shared/specs/                    Read specs for ACs (don't modify)
 
 1. **Read the spec** — always reference specs by their **Slack file ID** (e.g., `F0XXXXXXXXX`), never by local file path. Extract all Acceptance Criteria. **Never edit tracker.db directly** — use framework scripts to submit QA results.
 2. **Generate a test plan** — use your test planning skill to create a coverage matrix from the ACs.
-3. **Run tests via Claude Code** (your QA playbook with browser/API/E2E patterns preloads from `.claude/agents/{{QA_NAME_LOWER}}.md`):
+3. **Run tests via Claude Code** (your QA playbook preloads from `.claude/agents/{{QA_NAME_LOWER}}.md`). Full recipe in `../shared/CLAUDE-CODING.md`:
 
    **For UI/browser tasks:**
    ```bash
-   cd {{PROJECT_ROOT}} && claude --agent {{QA_NAME_LOWER}} -p 'Test these ACs against the running app:
+   cd {{PROJECT_ROOT}} && claude \
+     --agent {{QA_NAME_LOWER}} \
+     --permission-mode bypassPermissions \
+     --add-dir {{PROJECT_ROOT}} \
+     --output-format stream-json --verbose --include-partial-messages \
+     -p 'Test these ACs against the running app:
      ACs:
      1. <criterion 1>
      2. <criterion 2>
      Save screenshots to {{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/shared/qa-reports/screenshots/'
    ```
 
-   **For backend-only tasks** (API routes, webhooks, CLI):
+   **For backend-only tasks** (API routes, webhooks, CLI): same flags, different prompt:
    ```bash
-   cd {{PROJECT_ROOT}} && claude --agent {{QA_NAME_LOWER}} -p 'Test these API ACs:
+   cd {{PROJECT_ROOT}} && claude \
+     --agent {{QA_NAME_LOWER}} \
+     --permission-mode bypassPermissions \
+     --add-dir {{PROJECT_ROOT}} \
+     --output-format stream-json --verbose --include-partial-messages \
+     -p 'Test these API ACs:
      ACs:
      1. <criterion 1>
      2. <criterion 2>'
@@ -53,7 +63,12 @@ shared/specs/                    Read specs for ACs (don't modify)
 
    **For persistent E2E test suites** (when {{LEAD_NAME}}'s spec requires it):
    ```bash
-   cd {{PROJECT_ROOT}} && claude --agent {{QA_NAME_LOWER}} -p 'Generate Playwright tests for these ACs: <list ACs>'
+   cd {{PROJECT_ROOT}} && claude \
+     --agent {{QA_NAME_LOWER}} \
+     --permission-mode bypassPermissions \
+     --add-dir {{PROJECT_ROOT}} \
+     --output-format stream-json --verbose --include-partial-messages \
+     -p 'Generate Playwright tests for these ACs: <list ACs>'
    ```
 
 4. **Review Claude Code's output** — verify screenshots match claims, check for missed ACs

@@ -10,10 +10,15 @@ The human will review your findings later with {{LEAD_NAME}}. If you have questi
 
 ## Phase 1: Try to Run the Project
 
-Before exploring test infrastructure, verify the project can actually run. Read the project README and any `../shared/DEV.md` Lead may have written. Try to start the project via Claude Code:
+Before exploring test infrastructure, verify the project can actually run. Read the project README and any `../shared/DEV.md` Lead may have written. Try to start the project via Claude Code (full recipe in `../shared/CLAUDE-CODING.md` — flags are mandatory for subsession use):
 
 ```bash
-cd {{PROJECT_ROOT}} && claude --agent {{QA_NAME_LOWER}} -p 'Try to run the project at {{PROJECT_ROOT}}:
+cd {{PROJECT_ROOT}} && claude \
+  --agent {{QA_NAME_LOWER}} \
+  --permission-mode bypassPermissions \
+  --add-dir {{PROJECT_ROOT}} \
+  --output-format stream-json --verbose --include-partial-messages \
+  -p 'Try to run the project at {{PROJECT_ROOT}}:
   1. Read the README and package.json scripts
   2. Identify the dev server command
   3. Identify environment requirements (.env.example, .env.local, required services)
@@ -29,7 +34,12 @@ Record whether you could run it and any blockers. This is critical — you canno
 ## Phase 2: Explore Test Infrastructure via Claude Code
 
 ```bash
-cd {{PROJECT_ROOT}} && claude --agent {{QA_NAME_LOWER}} -p 'QA analysis of {{PROJECT_ROOT}}. Map:
+cd {{PROJECT_ROOT}} && claude \
+  --agent {{QA_NAME_LOWER}} \
+  --permission-mode bypassPermissions \
+  --add-dir {{PROJECT_ROOT}} \
+  --output-format stream-json --verbose --include-partial-messages \
+  -p 'QA analysis of {{PROJECT_ROOT}}. Map:
 
   1. Existing test files: Playwright, Cypress, Jest, Vitest — list test directories and test types.
   2. Test scripts in package.json: how to run each type of test.

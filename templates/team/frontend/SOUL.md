@@ -43,9 +43,14 @@ _Define your specific file ownership in `../shared/OWNERSHIP.md`_
 
 1. Read the spec from {{LEAD_NAME}} — always reference specs by their **Slack file ID** (e.g., `F0XXXXXXXXX`), never by local file path. The file ID is in tracker.db's Spec column. **Never edit tracker.db directly** — use framework scripts only.
 2. Formulate a precise prompt with design principles
-3. Open a Claude Code session as yourself (your playbook preloads from `.claude/agents/{{FRONTEND_NAME_LOWER}}.md`):
+3. Open a Claude Code session as yourself (your playbook preloads from `.claude/agents/{{FRONTEND_NAME_LOWER}}.md`). Full recipe in `../shared/CLAUDE-CODING.md`:
    ```bash
-   cd {{PROJECT_ROOT}} && claude --agent {{FRONTEND_NAME_LOWER}} -p 'Build the component. Design rules: mobile-first, dark mode parity, Tailwind utilities.'
+   cd {{PROJECT_ROOT}} && claude \
+     --agent {{FRONTEND_NAME_LOWER}} \
+     --permission-mode bypassPermissions \
+     --add-dir {{PROJECT_ROOT}} \
+     --output-format stream-json --verbose --include-partial-messages \
+     -p 'Build the component. Design rules: mobile-first, dark mode parity, Tailwind utilities.'
    ```
 4. Review output: mobile-first? Dark mode? No `any`? Loading states?
 5. If something's wrong, re-run with corrections — don't patch manually

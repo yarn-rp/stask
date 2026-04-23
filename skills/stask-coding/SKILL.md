@@ -17,6 +17,27 @@ Read all three sections. Flags in Section A are not optional; the template in Se
 
 ## Section A — Invoke Claude Code
 
+**Pick cwd based on whether the task has a worktree:**
+
+### Task has a worktree (In-Progress, Testing, most real work)
+
+`cd` into the worktree. Claude runs entirely inside the isolated checkout — no chance of touching the main repo or bleeding across tasks.
+
+```bash
+cd <WORKTREE_PATH> && claude \
+  --agent <your-lowercase-name> \
+  --permission-mode bypassPermissions \
+  --add-dir <WORKTREE_PATH> \
+  --output-format stream-json --verbose --include-partial-messages \
+  -p '<your prompt>'
+```
+
+The worktree is a git checkout of the same repo on the task's branch — it already contains the code, specs, `.claude/agents/`, `.claude/skills/`, and everything else Claude needs. No `--add-dir` to project root required.
+
+### Task has no worktree yet (Backlog / To-Do / bootstrap exploration)
+
+Fall back to the project root. Used for spec drafting, initial exploration, codebase scans — anything before a worktree has been created.
+
 ```bash
 cd <PROJECT_ROOT> && claude \
   --agent <your-lowercase-name> \
@@ -32,9 +53,15 @@ cd <PROJECT_ROOT> && claude \
 |------|-------------------------|
 | `--agent <name>` | Loads your identity + preloaded role skills from `.claude/agents/<name>.md`. Without this, the inner session has no role context. |
 | `--permission-mode bypassPermissions` | You are running inside a subsession — there is no human to click "approve" on tool prompts. Without this, Bash / Write / cross-dir Read are silently denied and your session returns "I can't do that". This is the #1 cause of seemingly-hung sessions. |
-| `--add-dir <PROJECT_ROOT>` | The project root is almost certainly outside your workspace cwd. `--add-dir` grants inner claude read/write access to it explicitly. |
+| `--add-dir <cwd>` | Explicit grant for the chosen cwd (worktree or project root). Keeps Claude scoped — it can't stray into the main checkout when you launched it in a worktree. |
 | `--output-format stream-json --verbose --include-partial-messages` | Streams every thought, tool call, and partial message to stdout as JSON lines. The outer subsession's bash monitor sees continuous output and won't kill your session as "hung". Without streaming, long tool uses look like silence. |
 | `-p '<prompt>'` | Non-interactive print mode — required for programmatic invocation. |
+
+### Why the worktree, not the project root
+
+- **Isolation.** Each stask task has its own git worktree on its own branch. Launching Claude inside it means any file it edits is on that branch — no risk of accidentally writing to `main` or another task's branch.
+- **No ambiguous "cd before editing" step.** Previous guidance had Claude cd into the worktree *inside* its session. Easy to forget, and a forgotten cd means edits land in the wrong checkout. Launching with cwd = worktree removes the step entirely.
+- **Preload still works.** `.claude/agents/` and `.claude/skills/` are committed to the repo, so they exist in every worktree. `--agent <name>` resolves the same way.
 
 ### Timing
 
@@ -58,11 +85,13 @@ Entry-point agnostic: it does not matter how you acquired the stask context (Lea
 
 ### Canonical prompt template
 
+Claude is already launched with cwd = the task's worktree (Section A), so the prompt treats the worktree as "here" — it does not tell Claude to `cd`. The Worktree line in CONTEXT is informational only (so Claude knows what branch / path it is in and can reference them in commit messages, reports, etc.).
+
 ```
 CONTEXT
 - Task: <taskId> — <taskName>
-- Spec: <specFileId or shared/specs/<taskId>.md>   (read via `stask show <taskId>` or open the file directly)
-- Worktree: <path> (branch: <branch>)              [cd here before any edits; omit if the task has no worktree yet]
+- Spec: <specFileId or specs/<taskId>.md>         (read via `stask show <taskId>` or open the file directly)
+- Worktree: you are in <path> on branch <branch>   [informational — this is your cwd]
 
 SUBTASKS YOU OWN
 - <subtaskId>: <name>      [read the spec section with the same ID]
@@ -71,12 +100,11 @@ SUBTASKS YOU OWN
 
 WORKFLOW PER SUBTASK
 1. Read the relevant section of the spec
-2. cd <worktree-path>
-3. Implement
-4. git add <files you changed>; git commit -m "<ref subtask ID>"
-5. git push
-6. <exact closing stask command — copy-paste, e.g. `stask subtask done T-042.1`>
-7. /compact   (between subtasks, to manage context)
+2. Implement (all edits land in this worktree on branch <branch>)
+3. git add <files you changed>; git commit -m "<ref subtask ID>"
+4. git push
+5. <exact closing stask command — copy-paste, e.g. `stask subtask done T-042.1`>
+6. /compact   (between subtasks, to manage context)
 
 CLOSE
 When all assigned subtasks are done, report back with a short summary and
@@ -86,10 +114,10 @@ list the stask commands you ran. The outer agent will verify state.
 ### Mandatory vs optional sections
 
 - **Task** — mandatory. Always name the task ID and title.
-- **Spec** — mandatory for any implementation / QA work. Pass the Slack file ID if available, otherwise the local path under `shared/specs/`. Tell Claude how to read it. For spec-drafting tasks there's no spec yet — replace with "Deliverable: write a spec to shared/specs/<taskId>.md" and use `stask spec-update <taskId> --spec <path>` as the closing command.
-- **Worktree** — mandatory when the task is In-Progress or Testing (a worktree exists). Omit for Backlog / To-Do (pre-worktree) tasks and say "work in the project root".
+- **Spec** — mandatory for any implementation / QA work. Pass the Slack file ID if available, otherwise the local path under `specs/`. Tell Claude how to read it. For spec-drafting tasks there's no spec yet — replace with "Deliverable: write a spec to specs/<taskId>.md" and use `stask spec-update <taskId> --spec <path>` as the closing command.
+- **Worktree** — mandatory when the task has a worktree (any task In-Progress or Testing). Because you already launched Claude with cwd = worktree, this section is informational ("you are in <path> on branch <branch>"), not a directive. Omit entirely for pre-worktree tasks (Backlog / To-Do exploration) — Claude is in the project root and there's nothing to say about a worktree that doesn't exist.
 - **Subtasks** — mandatory when any exist. For QA tasks that test the whole parent at once, collapse into a single "SCOPE" block (the whole task, not enumerated subtasks).
-- **Workflow** — adapt per role. Workers get git+push+subtask done. QA gets test-each-AC + write report + `stask qa <id> --verdict`. Lead gets draft spec + `stask spec-update` or code-review + `stask transition`. **Always name the closing stask command verbatim.**
+- **Workflow** — adapt per role. Workers get implement + git + push + subtask done. QA gets test-each-AC + write report + `stask qa <id> --verdict`. Lead gets draft spec + `stask spec-update` or code-review + `stask transition`. **Always name the closing stask command verbatim. Never include a `cd` step — Claude is already in the right cwd.**
 - **Close** — mandatory. Always ask Claude to list the stask commands it ran so you can cross-check in Section C.
 
 ### How to derive fields if your entry-point didn't hand them to you
@@ -144,6 +172,12 @@ Recovery:
 
 ## Quick-reference one-liner
 
+Task has a worktree (the common case):
+```bash
+cd <WORKTREE_PATH> && claude --agent <name> --permission-mode bypassPermissions --add-dir <WORKTREE_PATH> --output-format stream-json --verbose --include-partial-messages -p '<prompt per Section B>'
+```
+
+No worktree yet (spec drafting, bootstrap exploration):
 ```bash
 cd <PROJECT_ROOT> && claude --agent <name> --permission-mode bypassPermissions --add-dir <PROJECT_ROOT> --output-format stream-json --verbose --include-partial-messages -p '<prompt per Section B>'
 ```

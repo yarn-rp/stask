@@ -10,7 +10,7 @@
 
   "skills": {
     "clawhub": [
-      "qa-patrol",
+      { "name": "qa-patrol", "install_cmd": "npx -y skills add https://github.com/tahseen137/qa-patrol --skill qa-patrol -g -y" },
       "playwright-pro",
       "e2e-testing-patterns",
       "afrexai-qa-test-plan",

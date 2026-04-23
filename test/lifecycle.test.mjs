@@ -327,11 +327,17 @@ describe('Guard: require_subtasks', () => {
     assert.equal(checkFailures.length, 0);
   });
 
-  it('skipped for subtasks (non-parent tasks)', () => {
-    const task = makeTask({ 'Parent': 'T-400' });
-    const libs = makeMockLibs([]);
-    const result = runGuards(task, 'In-Progress', libs);
-    // Guards are skipped entirely for non-parent tasks
+  it('parent-only guards skipped for subtasks, but scope:any guards still run', () => {
+    // require_subtasks and require_approved are scope:parent — skipped for subtasks
+    // requireParentInProgress is scope:any — runs for subtasks too
+    // Parent T-400 is in In-Progress, so requireParentInProgress passes
+    const parent = makeTask({ 'Task ID': 'T-400', 'Status': 'In-Progress', 'Parent': 'None' });
+    const subtask = makeTask({ 'Task ID': 'T-400.1', 'Parent': 'T-400' });
+    const libs = makeMockLibs([subtask]);
+    // Add parent to findTask mock
+    libs.trackerDb.findTask = (id) => id === 'T-400' ? parent : null;
+    const result = runGuards(subtask, 'In-Progress', libs);
+    // Subtask passes — parent-only guards skipped, requireParentInProgress passes
     assert.equal(result.ok, true);
   });
 });

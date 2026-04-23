@@ -358,8 +358,8 @@ export async function run(args) {
     d.canvasId = ctx.canvasId;
 
     await stepBookmarks(s, ctx);
-    await stepWelcome(s, ctx);
     await stepBootstrapTask(s, ctx);
+    await stepWelcome(s, ctx);
 
     saveSetupState(state.projectSlug, state);
     completeStep(state, 'slackSetup');

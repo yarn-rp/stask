@@ -10,15 +10,11 @@ The human will review your findings later with {{LEAD_NAME}}. If you have questi
 
 ## Phase 1: Deep Exploration via Claude Code
 
-(Full invocation recipe in `../shared/CLAUDE-CODING.md` — all flags mandatory for subsession use.)
+Follow the `stask-coding` skill for the invocation recipe. This is a free-form exploration (no task/spec/subtask), so use Section A of that skill with this prompt:
 
 ```bash
-cd {{PROJECT_ROOT}} && claude \
-  --agent {{BACKEND_NAME_LOWER}} \
-  --permission-mode bypassPermissions \
-  --add-dir {{PROJECT_ROOT}} \
-  --output-format stream-json --verbose --include-partial-messages \
-  -p 'Deep backend analysis of {{PROJECT_ROOT}}. Map:
+# invocation flags per the stask-coding skill
+claude -p 'Deep backend analysis of {{PROJECT_ROOT}}. Map:
 
   1. API surface: all API routes, server actions, webhooks, middleware. For each: method, auth requirements, what it does.
   2. Data layer: database schema, tables, relationships, RLS policies, migrations list in order.

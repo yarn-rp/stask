@@ -38,10 +38,7 @@ Reply with a summary of what was spawned (or `HEARTBEAT_OK` if nothing to do). D
 
 ### After a spawned subsession returns
 
-The subsession spawns a Claude Code session (see `../shared/CLAUDE-CODING.md`). When you write the prompt for Claude, **explicitly tell it to close its work via the preloaded stask skills** — e.g. "When you're done, run `stask subtask done <id>` per the stask-worker skill." Claude's own agent file already instructs it to do this, but naming it in the prompt makes the contract unambiguous.
+Follow the `stask-coding` skill when spawning the Claude session and when interpreting its output. Short version:
 
-When Claude returns, **verify state** before marking your own work done:
-```bash
-stask --project {{PROJECT_SLUG}} show <task-id>
-```
-Confirm the expected transition actually happened (subtask status flipped, worktree clean, PR link attached, etc.). If Claude reported success but state disagrees, Claude likely hit a permission or CLI error — re-spawn with a corrective prompt or run the stask command yourself. Don't trust the report alone.
+- Use the skill's prompt template to name the spec, subtask IDs, and the exact closing command (`stask subtask done <id>`).
+- After Claude returns, run `stask show <task-id>` and confirm the expected transition actually landed (subtask flipped to Done, worktree clean, pushed). Don't trust the self-report alone — re-spawn or run the command yourself if state disagrees.

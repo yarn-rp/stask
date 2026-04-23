@@ -37,15 +37,11 @@ sessions_spawn({
 
 ### Self-explore (in parallel with the team)
 
-While the team explores, do your own high-level scan via Claude Code. Use the full recipe (see `../shared/CLAUDE-CODING.md`):
+While the team explores, do your own high-level scan via Claude Code. Follow the `stask-coding` skill for the invocation recipe — this is a free-form exploration (no task/spec/subtask), so just use Section A of that skill with this prompt:
 
 ```bash
-cd {{PROJECT_ROOT}} && claude \
-  --agent {{LEAD_NAME_LOWER}} \
-  --permission-mode bypassPermissions \
-  --add-dir {{PROJECT_ROOT}} \
-  --output-format stream-json --verbose --include-partial-messages \
-  -p 'Map the project at {{PROJECT_ROOT}}. Give me:
+# invocation flags per the stask-coding skill
+claude -p 'Map the project at {{PROJECT_ROOT}}. Give me:
   1. Project overview (README, package.json, what this project does)
   2. Directory structure — what lives where
   3. Tech stack — frameworks, database, auth, payments, deployment

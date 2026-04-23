@@ -22,7 +22,7 @@
       "feature-specification",
       "technical-spec-design"
     ],
-    "stask": ["stask-general", "stask-worker"]
+    "stask": ["stask-general", "stask-worker", "stask-coding"]
   },
 
   "cron": {

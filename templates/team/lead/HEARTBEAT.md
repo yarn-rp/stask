@@ -47,12 +47,8 @@ Reply with a summary: tasks spawned, blocked/review items flagged. Do NOT do del
 
 ### After a spawned subsession returns
 
-The subsession spawns a Claude Code session (see `../shared/CLAUDE-CODING.md`). When you write the prompt for Claude, **explicitly tell it which stask commands to run to close its work** — e.g. "When the spec is ready, run `stask spec-update <task-id> --spec <path>` and `stask transition <task-id> To-Do` per the stask-lead skill." Claude's agent file already instructs it to do this; naming it in the prompt makes the contract unambiguous.
+Follow the `stask-coding` skill when spawning the Claude session and when deciding what to do with its output. Short version:
 
-Lifecycle-level mutations that you own as the orchestrator (spec approval gates, subtask creation + assignment, PR creation, transitions to Done) stay with you. Work-completion writes that close a specific session (subtask done, qa submit, spec-update for a task in your queue) can run inside Claude.
-
-When Claude returns, **verify state** before transitioning further:
-```bash
-stask --project {{PROJECT_SLUG}} show <task-id>
-```
-Confirm the expected mutations actually landed. If Claude reported success but state disagrees, re-spawn with a corrective prompt or run the stask command yourself. Don't trust the report alone.
+- Use the skill's prompt template to pack the spec, subtask IDs, and closing stask command into the prompt.
+- Lifecycle-level mutations that you own as the orchestrator (spec approval gates, subtask creation + assignment, PR creation, transitions to Done) stay with you — do not hand them to Claude.
+- After Claude returns, run `stask show <task-id>` and confirm the expected mutations landed before transitioning further. If they didn't, re-spawn with a corrective prompt or run the command yourself.

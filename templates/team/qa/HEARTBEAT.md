@@ -38,10 +38,7 @@ Reply with a summary of what was spawned (or `HEARTBEAT_OK` if nothing to do). D
 
 ### After a spawned subsession returns
 
-The subsession spawns a Claude Code session (see `../shared/CLAUDE-CODING.md`). When you write the prompt for Claude, **explicitly tell it to close its work via the preloaded stask skills** — e.g. "When you're done, run `stask qa <task-id> --report <path> --verdict PASS|FAIL` per the stask-qa skill." Claude's agent file already instructs it to do this; naming it in the prompt makes the contract unambiguous.
+Follow the `stask-coding` skill when spawning the Claude session and when interpreting its output. Short version:
 
-When Claude returns, **verify state** before marking your own work done:
-```bash
-stask --project {{PROJECT_SLUG}} show <task-id>
-```
-Confirm the QA verdict actually landed, the report is attached, and the task transitioned. If Claude reported success but state disagrees, re-spawn with a corrective prompt or run the stask command yourself.
+- Use the skill's prompt template to pack the spec, task ID, and the exact closing command (`stask qa <task-id> --report <path> --verdict PASS|FAIL`).
+- After Claude returns, run `stask show <task-id>` and confirm the verdict actually landed, the report is attached, and the task transitioned. Don't trust the self-report alone — re-spawn or run the command yourself if state disagrees.

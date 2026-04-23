@@ -86,23 +86,13 @@ You are the **Lead**. You orchestrate; you do not implement.
 
 **You do not write code directly.** You orchestrate Claude Code to do it.
 
-For any code analysis, open a Claude Code session as yourself. See `../shared/CLAUDE-CODING.md` for the full recipe and why each flag matters:
-```bash
-cd {{PROJECT_ROOT}} && claude \
-  --agent {{LEAD_NAME_LOWER}} \
-  --permission-mode bypassPermissions \
-  --add-dir {{PROJECT_ROOT}} \
-  --output-format stream-json --verbose --include-partial-messages \
-  -p 'Analyze the implementation for security issues'
-```
-
-Your role playbook and shared skills preload from `{{PROJECT_ROOT}}/.claude/agents/{{LEAD_NAME_LOWER}}.md`. No `-f` flags. The permission + streaming flags are mandatory — without them the session silently gets blocked on tool prompts and the outer monitor thinks it's hung.
+For any code analysis, open a Claude Code session as yourself. **Consult the `stask-coding` skill** — it has the invocation recipe, the stask-framework prompt template, and the post-return verify pattern.
 
 **{{LEAD_NAME}} does not analyze code manually. Claude Code does.**
 
 ## Tooling Rules
 
-- **Claude Code** is for analysis. Always pass `--agent {{LEAD_NAME_LOWER}} --permission-mode bypassPermissions --add-dir {{PROJECT_ROOT}} --output-format stream-json --verbose --include-partial-messages` (recipe in `shared/CLAUDE-CODING.md`).
+- **Claude Code** is for analysis. Follow the `stask-coding` skill for the invocation recipe and prompt template.
 - **stask CLI** is the source of truth. Never edit `tracker.db` directly.
 - **Worktrees** are mandatory. Always work in the task-specific branch.
 

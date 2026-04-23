@@ -35,3 +35,13 @@ If a session exists but `updatedAt` is older than `staleSessionMinutes` (from th
 ### Step 4 — Return
 
 Reply with a summary of what was spawned (or `HEARTBEAT_OK` if nothing to do). Do NOT do any QA work in this session — that's for the spawned subsessions.
+
+### After a spawned subsession returns
+
+The subsession spawns a Claude Code session (see `../shared/CLAUDE-CODING.md`). When you write the prompt for Claude, **explicitly tell it to close its work via the preloaded stask skills** — e.g. "When you're done, run `stask qa <task-id> --report <path> --verdict PASS|FAIL` per the stask-qa skill." Claude's agent file already instructs it to do this; naming it in the prompt makes the contract unambiguous.
+
+When Claude returns, **verify state** before marking your own work done:
+```bash
+stask --project {{PROJECT_SLUG}} show <task-id>
+```
+Confirm the QA verdict actually landed, the report is attached, and the task transitioned. If Claude reported success but state disagrees, re-spawn with a corrective prompt or run the stask command yourself.

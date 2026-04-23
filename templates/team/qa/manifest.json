@@ -11,8 +11,8 @@
   "skills": {
     "clawhub": [
       { "name": "qa-patrol", "install_cmd": "npx -y skills add https://github.com/tahseen137/qa-patrol --skill qa-patrol -g -y" },
-      "playwright-pro",
-      "e2e-testing-patterns",
+      { "name": "playwright-pro", "install_cmd": "npx -y skills add borghei/claude-skills@playwright-pro -g -y" },
+      { "name": "e2e-testing-patterns", "install_cmd": "npx -y skills add wshobson/agents@e2e-testing-patterns -g -y" },
       "afrexai-qa-test-plan",
       "openclaw-api-tester"
     ],

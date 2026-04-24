@@ -102,6 +102,7 @@
             "app_mention",
             "assistant_thread_started",
             "channel_rename",
+            "file_change",
             "member_joined_channel",
             "member_left_channel",
             "message.channels",

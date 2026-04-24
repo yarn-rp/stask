@@ -1,131 +1,179 @@
 # Spec: Bootstrap Team — Explore Codebase & Set Up Agents
 
-## Overview
+## What to Bootstrap
 
-Replace the ad-hoc bootstrap chat flow with a structured stask task. After `stask setup` completes, a bootstrap task is auto-created with this spec attached and subtasks pre-defined for each agent. The welcome message links directly to the task thread, where all bootstrap discussion happens.
-
-**Why:** The current bootstrap process (reply-in-thread → free-form exploration) has inconsistent results: agents forget to write output, forget to notify lead, make wrong path decisions, and skip enrichment steps. This spec-driven approach ensures every bootstrap follows the same rigorous process.
+After `stask setup` completes, each agent explores the codebase, documents their findings, and sets up their workspace. This is the first thing every new team member does — understand the project before touching any code.
 
 ---
 
-## Technical Architecture
+## Backend Exploration (Berlin)
 
-The bootstrap task is created by `stask setup` at the end of the wizard (after Slack setup, before the welcome message). It:
+### What to Look For
+- API surface: all CLI commands, their arguments, and what they do
+- Data layer: SQLite schema, tables, relationships, triggers, migration strategy
+- External integrations: Slack API, GitHub CLI, Linear CLI — how they're called, auth, error handling
+- Code patterns: transaction wrapper, guard system, sync daemon, inbox polling
+- Tech debt: duplicated logic, inconsistent patterns, risky queries, missing error handling
 
-1. Runs `stask create --name "Bootstrap Team — Explore Codebase & Set Up Agents"` → creates task in Backlog with Slack thread attached
-2. Attaches this spec via `stask spec-update T-XXX --spec shared/specs/bootstrap-team.md`
-3. Creates subtasks for each agent via `stask subtask create --parent T-XXX --name "..." --assign <agent>`
-4. Transitions task to To-Do via `stask transition T-XXX "To-Do"`
-5. Posts welcome message with direct link to the task thread
+### Output Schema
 
-**Thread Model:** All bootstrap discussion happens in the Slack thread attached to the parent task. Each agent posts their questions/findings in that thread (not DMs). The thread URL is included in the welcome message.
+Write to `../shared/artifacts/bootstrap-backend.md`:
 
----
+```markdown
+# Backend Exploration Report
 
-## Backend Plan (Berlin)
+## Stack
+| Layer | Technology | Version | Notes |
+|-------|-----------|---------|-------|
 
-### Subtask: Backend Exploration
+## Data Model
+### Core Tables
+| Table | Columns | Purpose |
+|-------|---------|---------|
+### Triggers
+| Trigger | Purpose |
+|---------|---------|
 
-**What to do:**
-1. Spawn Claude Code session (as Berlin) following the `stask-coding` skill
-2. Deep exploration of backend codebase:
-   - API surface: all routes, server actions, webhooks, middleware (method, auth, purpose)
-   - Data layer: schema, tables, relationships, RLS policies, migrations (in order)
-   - External integrations: payment, auth, email, storage (config location, key patterns)
-   - Shared utilities: auth helpers, error handling, validation, logging
-   - Code patterns: auth checks, error returns, input validation (flag variations)
-   - Tech debt candidates: duplicated logic, inconsistent patterns, risky queries
-3. Write structured report to `../shared/artifacts/bootstrap-backend.md`
-4. Update your own `SOUL.md` (fill in "Your Stack") and `TOOLS.md` (add commands/paths)
-5. Post questions in the **parent task thread** (not DMs) — list anything you couldn't determine from code
-6. Run `stask subtask done` when complete
+## API Surface
+| Command | Type | Purpose |
+|---------|------|---------|
 
-**Required Deliverables:**
-- `../shared/artifacts/bootstrap-backend.md` with sections: Stack, Data Model, API Surface, External Integrations, Patterns Observed, Tech Debt Candidates, Questions for Human, Recommended Scope
-- Updated `SOUL.md` with actual backend stack
-- Updated `TOOLS.md` with project-specific commands/paths
-- Questions posted in parent task thread
+## External Integrations
+| Integration | Auth Method | Operations Used |
+|-------------|-----------|----------------|
 
----
+## Patterns Observed
+| Pattern | Where | Notes |
+|---------|-------|-------|
 
-## Frontend Plan (Tokyo)
+## Tech Debt Candidates
+| Item | Severity | File:Line | Description |
+|------|----------|-----------|-------------|
 
-### Subtask: Frontend Exploration
+## Questions for Human
+1. **@yan [QUESTION]** ...
 
-**What to do:**
-1. Spawn Claude Code session (as Tokyo) following the `stask-coding` skill
-2. Deep exploration of frontend codebase:
-   - Component architecture: pages, components, layout structure
-   - State architecture: UI state, domain state, server state, derived state (where each lives)
-   - Data flow: how data moves from API → state → components
-   - Styling: CSS framework, theme system, dark mode, responsive patterns
-   - Routing: client-side vs server-side, protected routes, redirects
-   - External integrations: analytics, error tracking, feature flags
-   - Tech debt candidates: unused components, inconsistent patterns, hard-coded values
-3. Write structured report to `../shared/artifacts/bootstrap-frontend.md`
-4. Update your own `SOUL.md` (fill in "Your Stack") and `TOOLS.md` (add commands/paths)
-5. Post questions in the **parent task thread** (not DMs)
-6. Run `stask subtask done` when complete
+## Recommended Scope
+### What Berlin Should Own
+### Immediate Priorities
+```
 
-**Required Deliverables:**
-- `../shared/artifacts/bootstrap-frontend.md` with sections: Stack, Component Architecture, State Architecture, Data Flow, Styling System, Routing, External Integrations, Tech Debt Candidates, Questions for Human, Recommended Scope
-- Updated `SOUL.md` with actual frontend stack
-- Updated `TOOLS.md` with project-specific commands/paths
-- Questions posted in parent task thread
+Also update:
+- Your `SOUL.md` — fill in "Your Stack" section
+- Your `TOOLS.md` — add project-specific commands and paths
+
+Post all questions in the **parent task thread** using `@yan [QUESTION]` format. Do not mark subtask done until questions are answered.
 
 ---
 
-## QA Plan (Helsinki)
+## Frontend Exploration (Tokyo)
 
-### Subtask: QA Audit
+### What to Look For
+- Component architecture: entry points, command structure, module hierarchy
+- State architecture: where state lives (SQLite, config, CLI flags), how it flows
+- Styling: terminal UI framework (`@clack/prompts`, `picocolors`), patterns used
+- Data flow: how CLI input → command → DB → Slack sync works end-to-end
+- Tech debt: unused modules, inconsistent patterns, hard-coded values
 
-**What to do:**
-1. Spawn Claude Code session (as Helsinki) following the `stask-coding` skill
-2. Codebase QA audit:
-   - Existing tests: test framework, coverage areas, test patterns, gaps
-   - Manual testing surface: critical user flows, edge cases, error states
-   - Accessibility: a11y patterns, missing ARIA, color contrast issues
-   - Performance: slow queries, unoptimized renders, missing caching
-   - Security: input validation, XSS/CSRF protection, secret handling
-   - Tech debt candidates: flaky tests, missing error handling, untested code paths
-3. Write structured report to `../shared/artifacts/bootstrap-qa.md`
-4. Update your own `SOUL.md` (fill in "Your Stack") and `TOOLS.md` (add commands/paths)
-5. Post questions in the **parent task thread** (not DMs)
-6. Run `stask subtask done` when complete
+### Output Schema
 
-**Required Deliverables:**
-- `../shared/artifacts/bootstrap-qa.md` with sections: Test Stack, Existing Coverage, Manual Testing Flows, Accessibility Audit, Performance Concerns, Security Concerns, Tech Debt Candidates, Questions for Human, Recommended Test Strategy
-- Updated `SOUL.md` with actual QA/test stack
-- Updated `TOOLS.md` with project-specific commands/paths
-- Questions posted in parent task thread
+Write to `../shared/artifacts/bootstrap-frontend.md`:
 
----
+```markdown
+# Frontend Exploration Report
 
-## Contract/API Between Them
+## Stack
+| Layer | Technology | Version | Notes |
+|-------|-----------|---------|-------|
 
-**Shared Artifacts Directory:** `../shared/artifacts/`
-- `bootstrap-backend.md` — Berlin's findings
-- `bootstrap-frontend.md` — Tokyo's findings
-- `bootstrap-qa.md` — Helsinki's findings
+## Component Architecture
+## State Architecture
+## Data Flow
+## Styling System
 
-**Communication:**
-- All questions posted in **parent task thread** (Slack)
-- No DMs to human or other agents
-- Lead monitors thread and consolidates questions for human
+## Tech Debt Candidates
+| Item | Severity | File:Line | Description |
+|------|----------|-----------|-------------|
 
-**File Enrichment:**
-- Each agent updates their own workspace files (`SOUL.md`, `TOOLS.md`)
-- Paths are workspace-relative (e.g., `/Users/yanrodriguez/.openclaw/workspace-{slug}/{agent}/SOUL.md`)
+## Questions for Human
+1. **@yan [QUESTION]** ...
 
-**Completion Signal:**
-- Each agent runs `stask subtask done` when their artifact is written and files enriched
-- Lead monitors via `stask heartbeat professor` or `stask show T-XXX`
+## Recommended Scope
+### What Tokyo Should Own
+### Immediate Priorities
+```
+
+Also update:
+- Your `SOUL.md` — fill in "Your Stack" section
+- Your `TOOLS.md` — add project-specific commands and paths
+
+Post all questions in the **parent task thread** using `@yan [QUESTION]` format. Do not mark subtask done until questions are answered.
 
 ---
 
-## Acceptance Criteria (Testable & Explicit)
+## QA Audit (Helsinki)
 
-- [ ] Bootstrap task created in Backlog with this spec attached
+### What to Investigate
+
+This is a **manual testing** exploration, not automated test auditing. Your job is to figure out how to actually run and test the project end-to-end:
+
+- **How to run the project:** What commands start the app? What prerequisites are needed? What environment variables?
+- **Login and credentials:** Does the app require authentication? How do you get credentials? Are there test accounts?
+- **Critical user flows:** What are the main things a user does? Walk through each one manually.
+- **Manual testing surface:** What can break that automated tests won't catch? Edge cases, error states, UI glitches.
+- **Getting started friction:** What would block a new team member from testing the app right now?
+- **Automated testing gaps:** Each worker owns their own unit tests. What's missing that needs integration or E2E coverage?
+
+**You are not complete until you can run a basic experiment with the most straightforward feature.**
+
+### Output Schema
+
+Write to `../shared/artifacts/bootstrap-qa.md`:
+
+```markdown
+# QA Exploration Report
+
+## How to Run the Project
+| Step | Command | Notes |
+|------|---------|-------|
+
+## Credentials & Access
+| Resource | How to Get Access | Notes |
+|----------|------------------|-------|
+
+## Critical User Flows
+| Flow | Steps | Status |
+|------|-------|--------|
+
+## Manual Testing Surface
+| Area | Risk | What to Test |
+|------|------|-------------|
+
+## Getting Started Blockers
+| Blocker | Severity | Workaround |
+|---------|----------|-----------|
+
+## Automated Testing Gaps
+| Area | Gap | Who Should Own |
+|------|-----|---------------|
+
+## Questions for Human
+1. **@yan [QUESTION]** ...
+
+## Recommended Test Strategy
+```
+
+Also update:
+- Your `SOUL.md` — fill in "Your Stack" section
+- Your `TOOLS.md` — add project-specific commands and paths
+
+Post all questions in the **parent task thread** using `@yan [QUESTION]` format. Do not mark subtask done until questions are answered.
+
+---
+
+## Acceptance Criteria
+
+- [ ] Bootstrap task created with this spec attached
 - [ ] 4 subtasks created and assigned (Professor, Berlin, Tokyo, Helsinki)
 - [ ] Task transitioned to To-Do (waiting for human spec approval)
 - [ ] Welcome message includes direct link to task thread
@@ -141,36 +189,21 @@ The bootstrap task is created by `stask setup` at the end of the wizard (after S
 
 ---
 
-## QA Considerations (Helsinki's Section)
-
-**QA Phase Gate:** This bootstrap task is special — QA is **not** a separate phase. Instead:
-- Helsinki's subtask **is** the QA audit of the existing codebase
-- No testing of the bootstrap task itself (it's a one-time setup task)
-- Helsinki validates their own artifact completeness before marking done
-
-**Success Metrics:**
-- All three artifacts exist and have all required sections
-- No "TBD" or "etc." in any artifact — all unknowns written as explicit questions
-- All agents enriched their own files (SOUL.md, TOOLS.md)
-- Human can review artifacts and answer all questions without needing follow-up exploration
-
----
-
 ## Implementation Notes (for stask setup wizard)
 
-**Where to hook in:** After `stepWelcome` (slack-canvas.mjs), before the final outro.
+**Where to hook in:** Before `stepWelcome` (so welcome message has the thread URL).
 
 **Steps:**
 1. `stask create --name "Bootstrap Team — Explore Codebase & Set Up Agents" --overview "Structured bootstrap task to explore codebase and set up all agents"` → returns task ID and thread ID
 2. `stask spec-update T-XXX --spec shared/specs/bootstrap-team.md`
-3. Create subtasks:
+3. `stask transition T-XXX "To-Do"`
+4. Create subtasks:
    - `stask subtask create --parent T-XXX --name "Lead: Orchestrate Bootstrap" --assign professor`
-   - `stask subtask create --parent T-XXX --name "Backend Exploration" --assign berlin` (or actual backend agent name)
-   - `stask subtask create --parent T-XXX --name "Frontend Exploration" --assign tokyo` (or actual frontend agent name)
-   - `stask subtask create --parent T-XXX --name "QA Audit" --assign helsinki` (or actual QA agent name)
-4. `stask transition T-XXX "To-Do"`
+   - `stask subtask create --parent T-XXX --name "Backend Exploration" --assign berlin`
+   - `stask subtask create --parent T-XXX --name "Frontend Exploration" --assign tokyo`
+   - `stask subtask create --parent T-XXX --name "QA Audit" --assign helsinki`
 5. Build task thread URL: `https://app.slack.com/client/{workspace}/{channelId}/thread/{channelId}-{threadTs}`
-6. Update welcome message to link to task thread instead of prompting a reply
+6. Pass URL to welcome message
 
 **Welcome Message Update:**
 Replace the current "Reply in this thread to trigger bootstrap" CTA with:

@@ -629,10 +629,16 @@ async function runPartial({ onlySteps, detectedRepoPath }) {
   if (onlySteps.has('list'))     await stepList(s, ctx);
   if (onlySteps.has('canvas'))   await stepCanvas(s, ctx);
   if (onlySteps.has('bookmark')) await stepBookmarks(s, ctx);
+
+  // Bootstrap must run BEFORE welcome — stepWelcome reads ctx.taskThreadUrl
+  // which stepBootstrapTask populates. The previous order (welcome first,
+  // bootstrap later) meant `--only bootstrap,welcome` always tripped the
+  // taskThreadUrl-missing guard and never reached bootstrap.
+  if (onlySteps.has('bootstrap'))  await stepBootstrapTask(s, ctx);
+
   if (onlySteps.has('welcome')) {
-    // Welcome links to the bootstrap task thread. In partial mode we don't
-    // run stepBootstrapTask — look up the thread from an existing task so
-    // the welcome CTA can still reference it.
+    // If bootstrap wasn't also requested, look up the thread from an
+    // existing task so the welcome CTA can still reference it.
     if (!ctx.taskThreadUrl && !onlySteps.has('bootstrap')) {
       ctx.taskThreadUrl = await resolveBootstrapTaskThread({ repoPath, slug, leadToken });
     }
@@ -648,7 +654,6 @@ async function runPartial({ onlySteps, detectedRepoPath }) {
   if (onlySteps.has('openclaw')) await stepOpenclaw(s, ctx, null, TEAM_MANIFEST);
   if (onlySteps.has('install'))  stepInstall(ctx);
   if (onlySteps.has('inbox'))      await stepInbox(s, ctx);
-  if (onlySteps.has('bootstrap'))  await stepBootstrapTask(s, ctx);
   if (onlySteps.has('claude')) {
     // Partial mode: .stask/config.json stores the stask role (lead/worker/qa),
     // which loses the backend vs frontend distinction. Infer manifest roleId

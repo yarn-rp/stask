@@ -13,6 +13,7 @@
     "skills/",
     ".agents/",
     "templates/",
+    "shared/",
     "config.example.json"
   ],
   "scripts": {

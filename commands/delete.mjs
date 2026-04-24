@@ -11,6 +11,7 @@
 import { CONFIG, getWorkspaceLibs } from '../lib/env.mjs';
 import { getSlackRowId } from '../lib/slack-row.mjs';
 import { TRIGGERS } from '../lib/tracker-db.mjs';
+import { ensureTable as ensureActiveSessionsTable } from '../lib/session-tracker.mjs';
 import { logError } from '../lib/error-logger.mjs';
 
 export async function run(argv) {
@@ -67,6 +68,10 @@ export async function run(argv) {
   db.exec('DROP TRIGGER IF EXISTS enforce_in_progress_requirements');
   db.exec('DROP TRIGGER IF EXISTS enforce_ready_for_review_requirements');
   db.exec('DROP TRIGGER IF EXISTS update_timestamp');
+
+  // active_sessions is created lazily by session-tracker; ensure it exists
+  // so delete works on fresh DBs that never claimed a session.
+  ensureActiveSessionsTable(db);
 
   try {
     db.exec('BEGIN');

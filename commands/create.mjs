@@ -8,9 +8,8 @@
  * Attach a spec later via: stask spec-update T-XXX --spec <path>
  */
 
-import { CONFIG, getWorkspaceLibs } from '../lib/env.mjs';
 import { withTransaction } from '../lib/tx.mjs';
-import { syncTaskToSlack, setThreadRef } from '../lib/slack-row.mjs';
+import { syncTaskToSlack } from '../lib/slack-row.mjs';
 
 function parseArgs(argv) {
   const args = {};
@@ -22,31 +21,6 @@ function parseArgs(argv) {
   return args;
 }
 
-/**
- * Discover the list item's comment thread on the list channel.
- * Slack Lists internally use a channel (list ID with F→C prefix swap).
- * Each list item gets a thread whose ts shares the same epoch second
- * as the item's date_created.
- *
- * @param {object} slackApi - Slack API module
- * @param {string} listChannelId - List channel ID (C-prefixed)
- * @param {number} itemDateCreated - Item's date_created (Unix epoch)
- */
-async function discoverListItemThread(slackApi, listChannelId, itemDateCreated) {
-  const epoch = String(itemDateCreated);
-  const oldest = String(itemDateCreated - 2);
-  const latest = String(itemDateCreated + 5);
-
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const result = await slackApi.getChannelHistory(listChannelId, { oldest, latest, limit: 10 });
-    const messages = result.messages || [];
-    const match = messages.find(m => m.ts && m.ts.startsWith(epoch + '.'));
-    if (match) return match.ts;
-    await new Promise(r => setTimeout(r, 1000));
-  }
-  return null;
-}
-
 export async function run(argv) {
   const args = parseArgs(argv);
 
@@ -55,56 +29,28 @@ export async function run(argv) {
     process.exit(1);
   }
 
-  const libs = await getWorkspaceLibs();
-
+  // syncTaskToSlack is the single source of truth for task-creation side
+  // effects: it creates the Slack list row AND seeds+persists the thread
+  // ref, throwing on any failure. Every creation path (this command,
+  // subtask-create, inbox actions) inherits the same hard-fail guarantee.
   const result = await withTransaction(
     (db, libs) => {
       const taskId = libs.trackerDb.getNextTaskId();
-
-      const taskFields = {
+      libs.trackerDb.insertTask({
         task_id: taskId,
         task_name: args.name,
         status: 'Backlog',
         type: args.type || 'Feature',
-      };
-
-      libs.trackerDb.insertTask(taskFields);
-
+      });
       libs.trackerDb.addLogEntry(taskId, `${taskId} "${args.name}" created. Status: Backlog.`);
-
       const taskRow = libs.trackerDb.findTask(taskId);
       return { taskId, taskRow };
     },
     async ({ taskRow }, db) => {
-      const { slackOps } = await syncTaskToSlack(db, taskRow);
-      return slackOps;
+      const sync = await syncTaskToSlack(db, taskRow, null, { overview: args.overview || null });
+      return sync.slackOps;
     }
   );
-
-  // Post-commit: discover list item thread and post creation message (best-effort)
-  try {
-    const listChannelId = CONFIG.slack.listId.replace(/^F/, 'C');
-    const db = libs.trackerDb.getDb();
-    // Get the Slack item's date_created (Unix epoch) to match the thread ts
-    const { getSlackRowId } = await import('../lib/slack-row.mjs');
-    const rowId = getSlackRowId(db, result.taskId);
-    const itemInfo = await libs.slackApi.slackApiRequest('POST', '/slackLists.items.info', {
-      list_id: CONFIG.slack.listId, id: rowId,
-    });
-    const dateCreated = itemInfo.record?.date_created;
-    if (dateCreated) {
-      const threadTs = await discoverListItemThread(libs.slackApi, listChannelId, dateCreated);
-      if (threadTs) {
-        const msg = args.overview
-          ? `*${result.taskId}: ${args.name}*\n\n${args.overview}`
-          : `*${result.taskId}: ${args.name}* — Created in Backlog. Requirements discussion starts here.`;
-        await libs.slackApi.postMessage(listChannelId, msg, { threadTs });
-        setThreadRef(db, result.taskId, listChannelId, threadTs);
-      }
-    }
-  } catch (err) {
-    console.error(`WARNING: Thread linking failed: ${err.message}`);
-  }
 
   console.log(`Created ${result.taskId}: "${args.name}" | Status: Backlog | Assigned: Unassigned`);
 }

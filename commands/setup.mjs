@@ -449,9 +449,10 @@ export async function run(args) {
     // Patch listId + (when available) real column/option IDs into the fresh config.
     // writeSlackIdsToConfig only rewrites keys the template declared, so passing {}
     // for columns on the 'existing' path is a safe no-op on those fields.
-    if (d.slackListId) {
+    if (d.slackListId || d.slackChannelId) {
       writeSlackIdsToConfig(path.join(staskDir, 'config.json'), {
         listId: d.slackListId,
+        channelId: d.slackChannelId,
         columns: d.slackListColumns || {},
         statusOptions: d.slackListStatusOptions || {},
         typeOptions: d.slackListTypeOptions || {},
@@ -564,19 +565,55 @@ export async function run(args) {
  * the welcome CTA can reference the task created in an earlier run.
  */
 async function resolveBootstrapTaskThread({ repoPath, slug, leadToken }) {
-  const staskBin = path.resolve(repoPath, 'bin', 'stask.mjs');
+  // Invoke the stask CLI that's actually running, not one sitting next to
+  // the user's repo. `import.meta.url` points to this file inside whichever
+  // stask install the user launched (global npm install or local checkout),
+  // so bin/stask.mjs next to it is always the right binary.
+  const staskBin = path.resolve(__dirname, '..', 'bin', 'stask.mjs');
   const run = (...args) => execFileSync(process.execPath, [staskBin, '--project', slug, ...args], {
     encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'],
   });
+
+  // Find the most likely bootstrap task. Try T-001 first, then fall back to
+  // the earliest task listed in the project.
+  let taskId = 'T-001';
+  let showOut;
   try {
-    const showOut = run('show', 'T-001');
-    const threadMatch = showOut.match(/Thread:\s+(\S+):(\S+)/);
-    if (!threadMatch) return '';
+    showOut = run('show', taskId);
+  } catch (err) {
+    const detail = ((err.stderr || err.stdout || err.message || '') + '').trim();
+    log.warn(`  ${pc.yellow('Welcome lookup')} ${taskId} show failed: ${pc.dim(detail.split('\n').pop() || 'unknown')}`);
+    try {
+      const list = run('list', '--json');
+      const rows = JSON.parse(list);
+      const first = Array.isArray(rows) ? rows[0] : null;
+      const firstId = first?.['Task ID'] || first?.id;
+      if (!firstId) {
+        log.warn(`  ${pc.yellow('Welcome lookup')} no tasks found in project ${pc.dim(slug)}`);
+        return '';
+      }
+      taskId = firstId;
+      showOut = run('show', taskId);
+    } catch (listErr) {
+      const detail = ((listErr.stderr || listErr.stdout || listErr.message || '') + '').trim();
+      log.warn(`  ${pc.yellow('Welcome lookup')} list fallback failed: ${pc.dim(detail.split('\n').pop() || 'unknown')}`);
+      return '';
+    }
+  }
+
+  const threadMatch = showOut.match(/Thread:\s+(\S+):(\S+)/);
+  if (!threadMatch) {
+    log.warn(`  ${pc.yellow('Welcome lookup')} ${taskId} has no Slack thread yet. Create it first with: ${pc.cyan(`stask --project ${slug} create`)}`);
+    return '';
+  }
+
+  try {
     const { getWorkspaceInfo } = await import('../lib/setup/steps.mjs');
     const wsInfo = await getWorkspaceInfo(leadToken);
     const [, channelId, threadTs] = threadMatch;
     return `https://app.slack.com/client/${wsInfo.teamId}/${channelId}/thread/${channelId}-${threadTs}`;
-  } catch {
+  } catch (err) {
+    log.warn(`  ${pc.yellow('Welcome lookup')} workspace info failed: ${pc.dim(err.message || 'unknown')}`);
     return '';
   }
 }
@@ -629,10 +666,16 @@ async function runPartial({ onlySteps, detectedRepoPath }) {
   if (onlySteps.has('list'))     await stepList(s, ctx);
   if (onlySteps.has('canvas'))   await stepCanvas(s, ctx);
   if (onlySteps.has('bookmark')) await stepBookmarks(s, ctx);
+
+  // Bootstrap must run BEFORE welcome — stepWelcome reads ctx.taskThreadUrl
+  // which stepBootstrapTask populates. The previous order (welcome first,
+  // bootstrap later) meant `--only bootstrap,welcome` always tripped the
+  // taskThreadUrl-missing guard and never reached bootstrap.
+  if (onlySteps.has('bootstrap'))  await stepBootstrapTask(s, ctx);
+
   if (onlySteps.has('welcome')) {
-    // Welcome links to the bootstrap task thread. In partial mode we don't
-    // run stepBootstrapTask — look up the thread from an existing task so
-    // the welcome CTA can still reference it.
+    // If bootstrap wasn't also requested, look up the thread from an
+    // existing task so the welcome CTA can still reference it.
     if (!ctx.taskThreadUrl && !onlySteps.has('bootstrap')) {
       ctx.taskThreadUrl = await resolveBootstrapTaskThread({ repoPath, slug, leadToken });
     }
@@ -648,7 +691,6 @@ async function runPartial({ onlySteps, detectedRepoPath }) {
   if (onlySteps.has('openclaw')) await stepOpenclaw(s, ctx, null, TEAM_MANIFEST);
   if (onlySteps.has('install'))  stepInstall(ctx);
   if (onlySteps.has('inbox'))      await stepInbox(s, ctx);
-  if (onlySteps.has('bootstrap'))  await stepBootstrapTask(s, ctx);
   if (onlySteps.has('claude')) {
     // Partial mode: .stask/config.json stores the stask role (lead/worker/qa),
     // which loses the backend vs frontend distinction. Infer manifest roleId

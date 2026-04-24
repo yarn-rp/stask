@@ -564,19 +564,55 @@ export async function run(args) {
  * the welcome CTA can reference the task created in an earlier run.
  */
 async function resolveBootstrapTaskThread({ repoPath, slug, leadToken }) {
-  const staskBin = path.resolve(repoPath, 'bin', 'stask.mjs');
+  // Invoke the stask CLI that's actually running, not one sitting next to
+  // the user's repo. `import.meta.url` points to this file inside whichever
+  // stask install the user launched (global npm install or local checkout),
+  // so bin/stask.mjs next to it is always the right binary.
+  const staskBin = path.resolve(__dirname, '..', 'bin', 'stask.mjs');
   const run = (...args) => execFileSync(process.execPath, [staskBin, '--project', slug, ...args], {
     encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'],
   });
+
+  // Find the most likely bootstrap task. Try T-001 first, then fall back to
+  // the earliest task listed in the project.
+  let taskId = 'T-001';
+  let showOut;
   try {
-    const showOut = run('show', 'T-001');
-    const threadMatch = showOut.match(/Thread:\s+(\S+):(\S+)/);
-    if (!threadMatch) return '';
+    showOut = run('show', taskId);
+  } catch (err) {
+    const detail = ((err.stderr || err.stdout || err.message || '') + '').trim();
+    log.warn(`  ${pc.yellow('Welcome lookup')} ${taskId} show failed: ${pc.dim(detail.split('\n').pop() || 'unknown')}`);
+    try {
+      const list = run('list', '--json');
+      const rows = JSON.parse(list);
+      const first = Array.isArray(rows) ? rows[0] : null;
+      const firstId = first?.['Task ID'] || first?.id;
+      if (!firstId) {
+        log.warn(`  ${pc.yellow('Welcome lookup')} no tasks found in project ${pc.dim(slug)}`);
+        return '';
+      }
+      taskId = firstId;
+      showOut = run('show', taskId);
+    } catch (listErr) {
+      const detail = ((listErr.stderr || listErr.stdout || listErr.message || '') + '').trim();
+      log.warn(`  ${pc.yellow('Welcome lookup')} list fallback failed: ${pc.dim(detail.split('\n').pop() || 'unknown')}`);
+      return '';
+    }
+  }
+
+  const threadMatch = showOut.match(/Thread:\s+(\S+):(\S+)/);
+  if (!threadMatch) {
+    log.warn(`  ${pc.yellow('Welcome lookup')} ${taskId} has no Slack thread yet. Create it first with: ${pc.cyan(`stask --project ${slug} create`)}`);
+    return '';
+  }
+
+  try {
     const { getWorkspaceInfo } = await import('../lib/setup/steps.mjs');
     const wsInfo = await getWorkspaceInfo(leadToken);
     const [, channelId, threadTs] = threadMatch;
     return `https://app.slack.com/client/${wsInfo.teamId}/${channelId}/thread/${channelId}-${threadTs}`;
-  } catch {
+  } catch (err) {
+    log.warn(`  ${pc.yellow('Welcome lookup')} workspace info failed: ${pc.dim(err.message || 'unknown')}`);
     return '';
   }
 }

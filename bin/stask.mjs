@@ -33,6 +33,17 @@ import { fileURLToPath } from 'url';
   }
 }
 
+// Handle --version / -v before any project resolution
+{
+  const v = process.argv[2];
+  if (v === '--version' || v === '-v') {
+    const pkgPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../package.json');
+    const { version } = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+    console.log(version);
+    process.exit(0);
+  }
+}
+
 // Commands that don't need a project context (work with global registry only)
 const NO_PROJECT_COMMANDS = new Set(['init', 'projects', 'heartbeat-all', 'setup', 'teardown', 'doctor']);
 
@@ -189,6 +200,7 @@ Team bootstrap commands:
 
 Global flags:
   --project <name>              Target a specific project (otherwise auto-detected from cwd)
+  --version, -v                 Print stask version and exit
 `);
 }
 

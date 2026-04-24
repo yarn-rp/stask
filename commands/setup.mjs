@@ -30,6 +30,7 @@ import { configGet, readRawSecret } from '../lib/setup/openclaw-cli.mjs';
 import {
   stepChannel, stepList, stepCanvas, stepBookmarks, stepWelcome,
   stepSkills, stepCron, stepOpenclaw, stepInstall, stepInbox,
+  stepBootstrapTask,
   buildContext, getWorkspaceInfo,
 } from '../lib/setup/steps.mjs';
 
@@ -357,6 +358,7 @@ export async function run(args) {
     d.canvasId = ctx.canvasId;
 
     await stepBookmarks(s, ctx);
+    await stepBootstrapTask(s, ctx);
     await stepWelcome(s, ctx);
 
     saveSetupState(state.projectSlug, state);
@@ -520,7 +522,7 @@ export async function run(args) {
   log.info([
     pc.bold('Your team is ready:'),
     '',
-    `  ${pc.bold('1.')} DM the Lead on Slack to trigger BOOTSTRAP onboarding`,
+    `  ${pc.bold('1.')} Review the bootstrap task spec and approve it to start onboarding`,
     `  ${pc.bold('2.')} Then DM each team member to bootstrap them too`,
     `  ${pc.bold('3.')} Describe a feature to the Lead and watch the team handle it`,
   ].join('\n'));
@@ -567,7 +569,7 @@ async function runPartial({ onlySteps, detectedRepoPath }) {
   log.info(`Steps: ${pc.cyan([...onlySteps].join(', '))}\n`);
 
   // Validate onlySteps - add 'inbox' to valid steps
-  const validSteps = ['channel', 'list', 'canvas', 'bookmark', 'welcome', 'skills', 'cron', 'openclaw', 'install', 'inbox'];
+  const validSteps = ['channel', 'list', 'canvas', 'bookmark', 'welcome', 'skills', 'cron', 'openclaw', 'install', 'inbox', 'bootstrap'];
   const invalidSteps = [...onlySteps].filter(s => !validSteps.includes(s));
   if (invalidSteps.length > 0) {
     log.error(`Invalid step(s): ${invalidSteps.join(', ')}`);
@@ -590,7 +592,8 @@ async function runPartial({ onlySteps, detectedRepoPath }) {
   if (onlySteps.has('cron'))     await stepCron(s, ctx, AGENT_MANIFESTS);
   if (onlySteps.has('openclaw')) await stepOpenclaw(s, ctx, null, TEAM_MANIFEST);
   if (onlySteps.has('install'))  stepInstall(ctx);
-  if (onlySteps.has('inbox'))    await stepInbox(s, ctx);
+  if (onlySteps.has('inbox'))      await stepInbox(s, ctx);
+  if (onlySteps.has('bootstrap'))  await stepBootstrapTask(s, ctx);
 
   outro(pc.green('Done'));
 }

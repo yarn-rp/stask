@@ -558,6 +558,29 @@ export async function run(args) {
 
 // ─── Partial Mode ────────────────────────────────────────────────
 
+/**
+ * Find the bootstrap task (first task in the project) and return its Slack
+ * thread URL, or '' if none is available. Used by partial welcome mode so
+ * the welcome CTA can reference the task created in an earlier run.
+ */
+async function resolveBootstrapTaskThread({ repoPath, slug, leadToken }) {
+  const staskBin = path.resolve(repoPath, 'bin', 'stask.mjs');
+  const run = (...args) => execFileSync(process.execPath, [staskBin, '--project', slug, ...args], {
+    encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  try {
+    const showOut = run('show', 'T-001');
+    const threadMatch = showOut.match(/Thread:\s+(\S+):(\S+)/);
+    if (!threadMatch) return '';
+    const { getWorkspaceInfo } = await import('../lib/setup/steps.mjs');
+    const wsInfo = await getWorkspaceInfo(leadToken);
+    const [, channelId, threadTs] = threadMatch;
+    return `https://app.slack.com/client/${wsInfo.teamId}/${channelId}/thread/${channelId}-${threadTs}`;
+  } catch {
+    return '';
+  }
+}
+
 async function runPartial({ onlySteps, detectedRepoPath }) {
   clearScreen();
   intro(pc.bold('stask setup') + pc.dim(' \u2014 Partial Mode'));
@@ -606,7 +629,15 @@ async function runPartial({ onlySteps, detectedRepoPath }) {
   if (onlySteps.has('list'))     await stepList(s, ctx);
   if (onlySteps.has('canvas'))   await stepCanvas(s, ctx);
   if (onlySteps.has('bookmark')) await stepBookmarks(s, ctx);
-  if (onlySteps.has('welcome'))  await stepWelcome(s, ctx);
+  if (onlySteps.has('welcome')) {
+    // Welcome links to the bootstrap task thread. In partial mode we don't
+    // run stepBootstrapTask — look up the thread from an existing task so
+    // the welcome CTA can still reference it.
+    if (!ctx.taskThreadUrl && !onlySteps.has('bootstrap')) {
+      ctx.taskThreadUrl = await resolveBootstrapTaskThread({ repoPath, slug, leadToken });
+    }
+    await stepWelcome(s, ctx);
+  }
 
   if (onlySteps.has('skills')) {
     const agentRoles = Object.entries(staskConfig.agents || {}).map(([name, cfg]) => ({ name, role: cfg.role === 'worker' ? 'backend' : cfg.role }));

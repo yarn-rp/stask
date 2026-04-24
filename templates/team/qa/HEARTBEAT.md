@@ -1,44 +1,24 @@
-# HEARTBEAT.md — {{QA_NAME}} (QA Engineer)
+# HEARTBEAT — {{QA_NAME_LOWER}}
 
-## Pipeline Heartbeat
+Fired by cron. Must be fast: query, spawn subsessions, return. **Never do implementation work in a heartbeat session** — that's for the subsessions you spawn.
 
-This heartbeat must be fast. Query for work, spawn subsessions, return.
+1. Poll for work:
+   ```bash
+   stask --project {{PROJECT_SLUG}} heartbeat {{QA_NAME_LOWER}}
+   ```
+   If `pendingTasks` is empty → reply `HEARTBEAT_OK` and stop.
 
-### Step 1 — Check for pending work
+2. For each pending task, check for a live session: `sessions_list(activeMinutes=10)`, look for label `pipeline:<task-id>`.
 
-```bash
-stask --project {{PROJECT_SLUG}} heartbeat {{QA_NAME_LOWER}}
-```
+3. For each pending task with no active session (or one older than `staleSessionMinutes`):
+   ```js
+   sessions_spawn({
+     agentId: "{{QA_NAME_LOWER}}",
+     cwd: "{{WORKSPACE_ROOT}}/{{QA_NAME_LOWER}}",
+     runtime: "subagent",
+     label: "pipeline:<task-id>",
+     task: "<prompt from the pendingTask JSON>"
+   })
+   ```
 
-Parse the JSON output. If `pendingTasks` is empty, reply `HEARTBEAT_OK` and stop.
-
-### Step 2 — Check active sessions
-
-For each pending task, call `sessions_list(activeMinutes=10)` and check if any session label contains `pipeline:<task-id>`.
-
-### Step 3 — Spawn or refresh
-
-For each pending task with no active session:
-
-```js
-sessions_spawn({
-  agentId: "{{QA_NAME_LOWER}}",
-  cwd: "{{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{QA_NAME_LOWER}}",
-  runtime: "subagent",
-  label: "pipeline:<task-id>",
-  task: "<prompt from the pendingTask JSON>"
-})
-```
-
-If a session exists but `updatedAt` is older than `staleSessionMinutes` (from the heartbeat config), spawn a fresh one to replace it.
-
-### Step 4 — Return
-
-Reply with a summary of what was spawned (or `HEARTBEAT_OK` if nothing to do). Do NOT do any QA work in this session — that's for the spawned subsessions.
-
-### After a spawned subsession returns
-
-Follow the `stask-coding` skill when spawning the Claude session and when interpreting its output. Short version:
-
-- Use the skill's prompt template to pack the spec, task ID, and the exact closing command (`stask qa <task-id> --report <path> --verdict PASS|FAIL`).
-- After Claude returns, run `stask show <task-id>` and confirm the verdict actually landed, the report is attached, and the task transitioned. Don't trust the self-report alone — re-spawn or run the command yourself if state disagrees.
+4. Reply with a summary of what you spawned (or `HEARTBEAT_OK`).

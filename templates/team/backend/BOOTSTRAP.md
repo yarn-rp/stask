@@ -4,7 +4,7 @@ _Spawned by {{LEAD_NAME}} for exploration. Delete when done._
 
 ## Your Task: Autonomous Backend Exploration
 
-{{LEAD_NAME}} spawned you to explore the backend of {{PROJECT_NAME}}. **Do NOT ask the human any questions.** Explore the codebase via Claude Code, write your findings to `../shared/artifacts/bootstrap-backend.md`, then terminate.
+{{LEAD_NAME}} spawned you to explore the backend of {{PROJECT_NAME}}. **Do NOT ask the human any questions.** Explore the codebase via Claude Code, write your findings to `{{WORKSPACE_ROOT}}/shared/artifacts/bootstrap-backend.md`, then terminate.
 
 The human will review your findings later with {{LEAD_NAME}}. If you have questions, write them into your artifact — don't ask them live.
 
@@ -30,13 +30,13 @@ claude -p 'Deep backend analysis of {{PROJECT_ROOT}}. Map:
 ## Phase 2: Cross-Reference with Shared Docs
 
 Read whatever shared docs already exist (Lead may have written some):
-- `../shared/DEV.md` — if it exists, skim for context
-- `../shared/STACK.md` — if it exists, confirm your findings match
+- `{{WORKSPACE_ROOT}}/shared/DEV.md` — if it exists, skim for context
+- `{{WORKSPACE_ROOT}}/shared/STACK.md` — if it exists, confirm your findings match
 - Any `.env.example` or README in the project root
 
 ## Phase 3: Write Findings
 
-Write a structured report to `../shared/artifacts/bootstrap-backend.md`:
+Write a structured report to `{{WORKSPACE_ROOT}}/shared/artifacts/bootstrap-backend.md`:
 
 ```markdown
 # Backend Exploration — {{BACKEND_NAME}}
@@ -79,8 +79,8 @@ _Suggested list of backend file paths/directories I should own, based on what I 
 ## Phase 4: Enrich Your Own Files
 
 Based on what you discovered, enrich your own templates:
-- Update `SOUL.md` — fill in "Your Stack" with actual technologies found
-- Update `TOOLS.md` — add commands, paths, references specific to this project
+- Add Notes / Gotchas you learned into your `AGENTS.md` (stack itself lives in `{{WORKSPACE_ROOT}}/shared/STACK.md`)
+- Fill in the `DEV.md` § Project Commands table with real build/test/lint commands
 
 ## Phase 5: Terminate
 

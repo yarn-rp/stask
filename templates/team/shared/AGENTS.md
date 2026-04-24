@@ -1,41 +1,137 @@
-# AGENTS.md — Universal Rules (All Agents)
+# Team AGENTS.md — {{PROJECT_NAME}}
 
-These rules apply to every agent on the {{PROJECT_NAME}} team. They are enforced by the stask framework's guard system — violations will be blocked at the CLI level.
+Universal rules for every agent. stask guards enforce these at the CLI level; violations get blocked.
 
-## Lifecycle Gates
+### Also read
 
-The stask framework enforces these gates via guards in `lib/guards.mjs`. Understanding them prevents wasted transitions.
+- [`README.md`](README.md) — project overview, priorities
+- [`STACK.md`](STACK.md) — stack, env, ownership, known issues
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — data model, patterns, routing
+- [`DEV.md`](DEV.md) — run, test, validate an AC
 
-| Gate | Guard Name | When | What It Checks |
-|------|-----------|------|----------------|
-| Spec required | `require_spec` | → To-Do | Task must have a spec attached |
-| Subtasks required | `require_subtasks` | → In-Progress | Parent must have ≥1 subtask, all assigned to workers |
-| Approval required | `require_approved` | → In-Progress | Task must not be assigned to human (approval triggers reassignment) |
-| All subtasks done | `all_subtasks_done` | → Testing | Every subtask must be in Done status |
-| Worktree clean | `worktree_clean` | → Testing, → RHR | No uncommitted changes in worktree |
-| Worktree pushed | `worktree_pushed` | → Testing, → RHR | No unpushed commits |
-| CLI Done blocked | `block_cli_done` | → Done | Parent tasks cannot be moved to Done via CLI |
+---
 
-## Hard Rules
+## The Crew
 
-1. **Approval gate:** A task in To-Do assigned to **Human** is NOT approved. Do not attempt to transition it to In-Progress. Wait for the `spec_approved` checkbox in Slack to trigger reassignment to the lead.
-2. **Subtask mandate:** Parent tasks must have all subtasks created and assigned BEFORE moving to In-Progress. No subtasks = no In-Progress transition.
-3. **Done is human-only:** Never run `stask transition <id> Done` on a parent task. Done happens when **Human** merges the PR and marks it complete in Slack.
-4. **QA is mandatory:** Every task must pass through Testing. There are no shortcuts from In-Progress to Ready for Human Review.
-5. **Worktree discipline:** All work happens in the task worktree. Commit and push before marking subtasks done or transitioning to Testing.
-6. **Database hands off:** Never edit tracker.db directly. Use `stask` commands for all task operations.
-7. **Subtask creation:** Use `stask subtask create --parent T-XXX`, never `stask create` for subtasks. `stask create` makes top-level tasks that cause Slack sync issues.
-8. **Backlog-first workflow:** All tasks start in Backlog via `stask create --name "..." [--overview "..."]`. No spec is attached at creation. After clarifying questions are answered, write the spec and attach it with `stask spec-update T-XXX --spec <path>`. The `require_spec` guard prevents moving to To-Do without a spec.
-9. **QA is a separate phase, NOT a subtask:** Subtasks are for development work only (worker implementation). QA happens AFTER all subtasks are done, via the Testing phase (phase gate). Do NOT create QA subtasks. The QA phase is triggered when workers mark subtasks done, and the `all_subtasks_done` guard enables the Testing transition.
-10. **QA test cleanup:** QA must delete any tasks created for testing purposes once testing is complete. Use `stask delete <task-id>`. No test artifacts should remain in the task board or Slack list after QA is done.
+| Agent | Role |
+|-------|------|
+| **{{LEAD_NAME}}** 🧠 | Tech Lead — plans, specs, delegates, reviews |
+| **{{BACKEND_NAME}}** 🔒 | Backend — API, DB, auth, infra |
+| **{{FRONTEND_NAME}}** 🎨 | Frontend — pages, components, styling |
+| **{{QA_NAME}}** 🧪 | QA — browser tests, API tests, reports |
+| **{{HUMAN_NAME}}** | Owner / Human Reviewer |
 
-## Slack Communication (Hard Rules)
+## Task flow
 
-All work happens in the project Slack. These rules are non-negotiable.
+```
+{{HUMAN_NAME}} → {{LEAD_NAME}} (spec + ACs)
+         → {{BACKEND_NAME}} / {{FRONTEND_NAME}} (build in worktree)
+             → {{QA_NAME}} (test against ACs)
+                 → {{LEAD_NAME}} (review + PR)
+                     → {{HUMAN_NAME}} (merge)
+```
 
-1. **Never DM work updates.** Progress reports, blockers, QA verdicts, PR notices, questions to a teammate — all of it goes in Slack, but never as a direct message.
-2. **Task-scoped updates go in the task's thread.** Every task stask creates has a dedicated thread in `#{{PROJECT_SLUG}}-project`, persisted in the `slack_row_ids` table. Look the thread up with `getThreadRef(db, taskId)` (from `lib/slack-row.mjs`) or via `stask show <id>`. For subtasks, post in the parent task's thread — `postThreadUpdate()` auto-resolves this.
-3. **Broadcasts go in the project channel, top level.** General team announcements (weekly recap, architecture decision that affects everyone, release ready) post in `#{{PROJECT_SLUG}}-project` at the channel root, not a thread.
-4. **If you can't find the thread, ask in channel — don't DM.** Post top-level in the project channel referencing the task ID. Never resort to DMs as a fallback.
+Per-state commands live in each agent's own `AGENTS.md` § *stask by state*.
 
-`stask` already auto-posts lifecycle events (transitions, QA verdicts, subtask creation) to the task thread via `postThreadUpdate(...)`. Your human-readable updates belong next to those machine updates, not scattered across DMs. Silence in the thread looks like inactivity; reports in DM look like secrets.
+---
+
+## Lifecycle gates (enforced by `lib/guards.mjs`)
+
+| Gate | When | Checks |
+|------|------|--------|
+| `require_spec` | → To-Do | Spec attached |
+| `require_subtasks` | → In-Progress | ≥1 subtask, all assigned |
+| `require_approved` | → In-Progress | `spec_approved` ticked |
+| `all_subtasks_done` | → Testing | Every subtask Done |
+| `worktree_clean` | → Testing, → RHR | No uncommitted changes |
+| `worktree_pushed` | → Testing, → RHR | No unpushed commits |
+| `block_cli_done` | → Done | Parent tasks can't be CLI-transitioned |
+
+## Hard rules
+
+1. Task in To-Do assigned to **Human** = NOT approved. Wait for `spec_approved` in Slack.
+2. Subtasks created + assigned BEFORE In-Progress.
+3. Done is human-only. Only {{HUMAN_NAME}} marks Done (by merging the PR).
+4. QA is a phase, never a subtask.
+5. Work in the task worktree. Commit + push before `stask subtask done` or transitioning to Testing.
+6. Never edit `tracker.db` directly — always through `stask`.
+7. `stask subtask create --parent T-XXX` for subtasks. Never `stask create`.
+8. Tasks start in Backlog. Attach spec via `stask spec-update` once clarifying questions are answered.
+9. QA deletes test-only tasks after testing: `stask delete <task-id>`.
+
+---
+
+## Slack
+
+- **Channel:** `#{{PROJECT_SLUG}}-project` (`{{SLACK_CHANNEL_ID}}`)
+- **Task board (List):** `{{SLACK_LIST_ID}}` — syncs bidirectionally with `tracker.db`
+- **Pings {{HUMAN_NAME}}:** Ready for Human Review, Blocked
+
+### Rules
+
+1. **Never DM work updates.** Progress, blockers, verdicts, questions → Slack only.
+2. Task-scoped updates go in the **task's thread**. Look up via `stask show <id>`.
+3. Broadcasts go at channel root (weekly recap, architecture decision, release ready).
+4. Can't find the thread? Ask in channel referencing task ID — never DM as fallback.
+
+`stask` auto-posts lifecycle events to the thread. Your human-readable updates belong there too.
+
+### Accounts
+
+| Slack | Agent |
+|---|---|
+| `{{LEAD_NAME_LOWER}}` | {{LEAD_NAME}} |
+| `{{BACKEND_NAME_LOWER}}` | {{BACKEND_NAME}} |
+| `{{FRONTEND_NAME_LOWER}}` | {{FRONTEND_NAME}} |
+| `{{QA_NAME_LOWER}}` | {{QA_NAME}} |
+| `{{HUMAN_SLACK_USER_ID}}` | {{HUMAN_NAME}} |
+
+---
+
+## Code Conventions
+
+_Fill in during bootstrap — project-specific rules everyone follows._
+
+- Language / types: _type strictness, where types live, validation approach_
+- Server-side: _server-action patterns, auth-check requirements, error handling_
+- Components: _patterns, styling, state management_
+- File naming: _conventions_
+
+Stack → [`STACK.md`](STACK.md). Patterns → [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
+## Git & PR
+
+- Branches: `feature/<slug>`, `fix/<slug>`, `chore/<slug>`. Always off `main`. `stask` creates the worktree + branch on `transition … In-Progress`.
+- Conventional commits: `feat: …`, `fix: …`, `chore: …`, `docs: …`, `refactor: …`, `test: …`. Atomic — one logical change per commit.
+- PR: title matches commit style; description = what / why / how to test; type check + lint pass (see [`DEV.md`](DEV.md)); {{QA_NAME}} verdict attached; {{LEAD_NAME}} approves before merge.
+- Only {{LEAD_NAME}} or {{HUMAN_NAME}} merges to `main`.
+- Migrations: test locally first, {{QA_NAME}} reviews the SQL, irreversible once run.
+
+---
+
+## Definition of Done
+
+A task is not done until every applicable item is checked. Commands → [`DEV.md`](DEV.md).
+
+- [ ] Type check + lint pass, zero errors
+- [ ] No `any`, no stray `console.log`, no commented-out code
+- [ ] All ACs met; edge cases handled (empty, loading, error)
+- [ ] Auth checks on every mutation; errors human-readable
+- [ ] Migrations (if any) reviewed by {{LEAD_NAME}}
+- [ ] UI: desktop + mobile + dark mode + loading/empty states
+- [ ] Unit tests by worker, happy path + key error cases
+- [ ] Handoff note at `{{WORKSPACE_ROOT}}/shared/artifacts/<task-name>.md`
+- [ ] QA report at `{{WORKSPACE_ROOT}}/shared/qa-reports/<date>-<feature>.md`, screenshots for every AC, verdict PASS
+- [ ] {{LEAD_NAME}} reviewed code + report; build passes
+
+---
+
+## Shared directories
+
+```
+{{WORKSPACE_ROOT}}/shared/
+├── specs/       ← {{LEAD_NAME}} writes task specs
+├── artifacts/   ← worker handoff notes
+├── qa-reports/  ← QA reports + screenshots/
+└── {README, AGENTS, STACK, ARCHITECTURE, DEV}.md   ← these 5 docs
+```

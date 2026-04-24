@@ -4,13 +4,13 @@ _Spawned by {{LEAD_NAME}} for exploration. Delete when done._
 
 ## Your Task: Autonomous QA Exploration + Verify the Project Runs
 
-{{LEAD_NAME}} spawned you to explore the project from a QA perspective. **Do NOT ask the human any questions.** Explore the codebase via Claude Code, try to run the project, write your findings to `../shared/artifacts/bootstrap-qa.md`, then terminate.
+{{LEAD_NAME}} spawned you to explore the project from a QA perspective. **Do NOT ask the human any questions.** Explore the codebase via Claude Code, try to run the project, write your findings to `{{WORKSPACE_ROOT}}/shared/artifacts/bootstrap-qa.md`, then terminate.
 
 The human will review your findings later with {{LEAD_NAME}}. If you have questions, write them into your artifact — don't ask them live.
 
 ## Phase 1: Try to Run the Project
 
-Before exploring test infrastructure, verify the project can actually run. Read the project README and any `../shared/DEV.md` Lead may have written. Try to start the project via Claude Code — follow the `stask-coding` skill for the invocation recipe; this bootstrap step is free-form (no task/spec/subtask):
+Before exploring test infrastructure, verify the project can actually run. Read the project README and any `{{WORKSPACE_ROOT}}/shared/DEV.md` Lead may have written. Try to start the project via Claude Code — follow the `stask-coding` skill for the invocation recipe; this bootstrap step is free-form (no task/spec/subtask):
 
 ```bash
 # invocation flags per the stask-coding skill
@@ -22,7 +22,7 @@ claude -p 'Try to run the project at {{PROJECT_ROOT}}:
   5. If it starts, navigate to the URL and take a screenshot of the homepage
   6. Report: did it work? what failed? what was missing?
 
-  Save any screenshots to {{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/shared/qa-reports/screenshots/'
+  Save any screenshots to {{WORKSPACE_ROOT}}/shared/qa-reports/screenshots/'
 ```
 
 Record whether you could run it and any blockers. This is critical — you cannot test what you cannot run.
@@ -47,7 +47,7 @@ claude -p 'QA analysis of {{PROJECT_ROOT}}. Map:
 
 ## Phase 3: Write Findings
 
-Write a structured report to `../shared/artifacts/bootstrap-qa.md`:
+Write a structured report to `{{WORKSPACE_ROOT}}/shared/artifacts/bootstrap-qa.md`:
 
 ```markdown
 # QA Exploration — {{QA_NAME}}
@@ -93,7 +93,7 @@ _Critical gaps — these will block testing:_
 ## Phase 4: Enrich Your Own Files
 
 Based on what you discovered:
-- Update `TOOLS.md` with: how to run the project, test commands, screenshot paths, report paths
+- Fill in `DEV.md` § Project Commands with: how to run the project, test commands, screenshot paths, report paths
 - Leave placeholders for test account credentials — the human will fill those in via {{LEAD_NAME}}
 
 ## Phase 5: Terminate

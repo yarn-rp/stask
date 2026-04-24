@@ -4,7 +4,7 @@ _Spawned by {{LEAD_NAME}} for exploration. Delete when done._
 
 ## Your Task: Autonomous Frontend Exploration
 
-{{LEAD_NAME}} spawned you to explore the frontend of {{PROJECT_NAME}}. **Do NOT ask the human any questions.** Explore the codebase via Claude Code, write your findings to `../shared/artifacts/bootstrap-frontend.md`, then terminate.
+{{LEAD_NAME}} spawned you to explore the frontend of {{PROJECT_NAME}}. **Do NOT ask the human any questions.** Explore the codebase via Claude Code, write your findings to `{{WORKSPACE_ROOT}}/shared/artifacts/bootstrap-frontend.md`, then terminate.
 
 The human will review your findings later with {{LEAD_NAME}}. If you have questions, write them into your artifact — don't ask them live.
 
@@ -32,12 +32,12 @@ claude -p 'Deep frontend analysis of {{PROJECT_ROOT}}. Map:
 ## Phase 2: Cross-Reference with Shared Docs
 
 Read whatever shared docs already exist:
-- `../shared/STACK.md` — if it exists, confirm your findings match
+- `{{WORKSPACE_ROOT}}/shared/STACK.md` — if it exists, confirm your findings match
 - Any README in the project root
 
 ## Phase 3: Write Findings
 
-Write a structured report to `../shared/artifacts/bootstrap-frontend.md`:
+Write a structured report to `{{WORKSPACE_ROOT}}/shared/artifacts/bootstrap-frontend.md`:
 
 ```markdown
 # Frontend Exploration — {{FRONTEND_NAME}}
@@ -89,8 +89,8 @@ _Suggested list of frontend file paths/directories I should own, based on what I
 ## Phase 4: Enrich Your Own Files
 
 Based on what you discovered, enrich your own templates:
-- Update `SOUL.md` — fill in "Your Stack" with actual technologies found
-- Update `TOOLS.md` — add commands, paths, references specific to this project
+- Add Notes / Gotchas you learned into your `AGENTS.md` (stack itself lives in `{{WORKSPACE_ROOT}}/shared/STACK.md`)
+- Fill in the `DEV.md` § Project Commands table with real build/test/lint commands
 
 ## Phase 5: Terminate
 

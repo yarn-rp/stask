@@ -59,8 +59,8 @@ Write to `../shared/artifacts/bootstrap-backend.md`:
 ```
 
 Also update:
-- Your `SOUL.md` — fill in "Your Stack" section
-- Your `TOOLS.md` — add project-specific commands and paths
+- Your `AGENTS.md` — add Notes/Gotchas from exploration
+- `{{WORKSPACE_ROOT}}/shared/DEV.md` — fill in real build/test/lint/validation commands
 
 Post all questions in the **parent task thread** using `@yan [QUESTION]` format. Do not mark subtask done until questions are answered.
 
@@ -104,8 +104,8 @@ Write to `../shared/artifacts/bootstrap-frontend.md`:
 ```
 
 Also update:
-- Your `SOUL.md` — fill in "Your Stack" section
-- Your `TOOLS.md` — add project-specific commands and paths
+- Your `AGENTS.md` — add Notes/Gotchas from exploration
+- `{{WORKSPACE_ROOT}}/shared/DEV.md` — fill in real build/test/lint/validation commands
 
 Post all questions in the **parent task thread** using `@yan [QUESTION]` format. Do not mark subtask done until questions are answered.
 
@@ -164,8 +164,8 @@ Write to `../shared/artifacts/bootstrap-qa.md`:
 ```
 
 Also update:
-- Your `SOUL.md` — fill in "Your Stack" section
-- Your `TOOLS.md` — add project-specific commands and paths
+- Your `AGENTS.md` — add Notes/Gotchas from exploration
+- `{{WORKSPACE_ROOT}}/shared/DEV.md` — fill in real build/test/lint/validation commands
 
 Post all questions in the **parent task thread** using `@yan [QUESTION]` format. Do not mark subtask done until questions are answered.
 
@@ -180,8 +180,8 @@ Post all questions in the **parent task thread** using `@yan [QUESTION]` format.
 - [ ] Berlin writes `../shared/artifacts/bootstrap-backend.md` with all required sections
 - [ ] Tokyo writes `../shared/artifacts/bootstrap-frontend.md` with all required sections
 - [ ] Helsinki writes `../shared/artifacts/bootstrap-qa.md` with all required sections
-- [ ] All agents update their `SOUL.md` with actual stack info
-- [ ] All agents update their `TOOLS.md` with project-specific commands/paths
+- [ ] Stack populated in `{{WORKSPACE_ROOT}}/shared/STACK.md` by Lead
+- [ ] `{{WORKSPACE_ROOT}}/shared/DEV.md` Project Commands table filled in
 - [ ] All agent questions posted in parent task thread (not DMs)
 - [ ] All subtasks marked done via `stask subtask done`
 - [ ] Lead consolidates findings and posts bootstrap summary in thread

@@ -449,9 +449,10 @@ export async function run(args) {
     // Patch listId + (when available) real column/option IDs into the fresh config.
     // writeSlackIdsToConfig only rewrites keys the template declared, so passing {}
     // for columns on the 'existing' path is a safe no-op on those fields.
-    if (d.slackListId) {
+    if (d.slackListId || d.slackChannelId) {
       writeSlackIdsToConfig(path.join(staskDir, 'config.json'), {
         listId: d.slackListId,
+        channelId: d.slackChannelId,
         columns: d.slackListColumns || {},
         statusOptions: d.slackListStatusOptions || {},
         typeOptions: d.slackListTypeOptions || {},
@@ -600,17 +601,23 @@ async function resolveBootstrapTaskThread({ repoPath, slug, leadToken }) {
     }
   }
 
-  const threadMatch = showOut.match(/Thread:\s+(\S+):(\S+)/);
-  if (!threadMatch) {
-    log.warn(`  ${pc.yellow('Welcome lookup')} ${taskId} has no Slack thread yet. Create it first with: ${pc.cyan(`stask --project ${slug} create`)}`);
+  const rowMatch = showOut.match(/Row:\s+(\S+)/);
+  if (!rowMatch) {
+    log.warn(`  ${pc.yellow('Welcome lookup')} ${taskId} has no Slack row id yet. Create it first with: ${pc.cyan(`stask --project ${slug} create`)}`);
     return '';
   }
 
   try {
     const { getWorkspaceInfo } = await import('../lib/setup/steps.mjs');
     const wsInfo = await getWorkspaceInfo(leadToken);
-    const [, channelId, threadTs] = threadMatch;
-    return `https://app.slack.com/client/${wsInfo.teamId}/${channelId}/thread/${channelId}-${threadTs}`;
+    const [, rowId] = rowMatch;
+    const staskConfig = JSON.parse(fs.readFileSync(path.join(repoPath, '.stask', 'config.json'), 'utf-8'));
+    const listId = staskConfig.slack?.listId;
+    if (!listId) {
+      log.warn(`  ${pc.yellow('Welcome lookup')} slack.listId missing from .stask/config.json`);
+      return '';
+    }
+    return `${wsInfo.url}/lists/${wsInfo.teamId}/${listId}?record_id=${rowId}`;
   } catch (err) {
     log.warn(`  ${pc.yellow('Welcome lookup')} workspace info failed: ${pc.dim(err.message || 'unknown')}`);
     return '';

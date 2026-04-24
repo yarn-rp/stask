@@ -35,3 +35,10 @@ If a session exists but `updatedAt` is older than `staleSessionMinutes` (from th
 ### Step 4 — Return
 
 Reply with a summary of what was spawned (or `HEARTBEAT_OK` if nothing to do). Do NOT do any implementation work in this session — that's for the spawned subsessions.
+
+### After a spawned subsession returns
+
+Follow the `stask-coding` skill when spawning the Claude session and when interpreting its output. Short version:
+
+- Use the skill's prompt template to name the spec, subtask IDs, and the exact closing command (`stask subtask done <id>`).
+- After Claude returns, run `stask show <task-id>` and confirm the expected transition actually landed (subtask flipped to Done, worktree clean, pushed). Don't trust the self-report alone — re-spawn or run the command yourself if state disagrees.

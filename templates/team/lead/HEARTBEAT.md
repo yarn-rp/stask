@@ -44,3 +44,11 @@ If any blocked tasks found, note them for awareness.
 ### Step 3 — Return
 
 Reply with a summary: tasks spawned, blocked/review items flagged. Do NOT do delegation, spec writing, or code review work inline — that's for the spawned subsessions.
+
+### After a spawned subsession returns
+
+Follow the `stask-coding` skill when spawning the Claude session and when deciding what to do with its output. Short version:
+
+- Use the skill's prompt template to pack the spec, subtask IDs, and closing stask command into the prompt.
+- Lifecycle-level mutations that you own as the orchestrator (spec approval gates, subtask creation + assignment, PR creation, transitions to Done) stay with you — do not hand them to Claude.
+- After Claude returns, run `stask show <task-id>` and confirm the expected mutations landed before transitioning further. If they didn't, re-spawn with a corrective prompt or run the command yourself.

@@ -23,7 +23,7 @@
       "pre-mortem-analyst",
       "feature-specification"
     ],
-    "stask": ["stask-general", "stask-lead"]
+    "stask": ["stask-general", "stask-lead", "stask-coding"]
   },
 
   "cron": {

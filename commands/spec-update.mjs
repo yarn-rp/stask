@@ -6,8 +6,15 @@
 
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { createHash } from 'crypto';
 import { CONFIG, getWorkspaceLibs } from '../lib/env.mjs';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Bundled templates that ship with the stask package — referenced as
+// `shared/...` paths. Checked as a fallback when the project's specsDir
+// doesn't contain the file.
+const BUNDLED_SHARED_DIR = path.resolve(__dirname, '..', 'shared');
 import { withTransaction } from '../lib/tx.mjs';
 import { syncTaskToSlack } from '../lib/slack-row.mjs';
 
@@ -30,8 +37,14 @@ export async function run(argv) {
   if (!task) { console.error(`ERROR: Task ${taskId} not found`); process.exit(1); }
 
   const relPath = specPath.startsWith('shared/') ? specPath : path.relative(ws, path.resolve(specPath));
-  const fullPath = path.resolve(ws, relPath);
-  if (!fs.existsSync(fullPath)) { console.error(`ERROR: Spec not found: ${relPath}`); process.exit(1); }
+  const projectPath = path.resolve(ws, relPath);
+  const bundledPath = relPath.startsWith('shared/')
+    ? path.resolve(BUNDLED_SHARED_DIR, relPath.slice('shared/'.length))
+    : null;
+  const fullPath = fs.existsSync(projectPath)
+    ? projectPath
+    : (bundledPath && fs.existsSync(bundledPath) ? bundledPath : null);
+  if (!fullPath) { console.error(`ERROR: Spec not found: ${relPath}`); process.exit(1); }
 
   const content = fs.readFileSync(fullPath, 'utf-8');
   const registry = libs.fileUploader.loadRegistry(CONFIG.registryPath);

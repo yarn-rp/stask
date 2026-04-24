@@ -4,8 +4,18 @@
   "projectRepoPath": ".",
   "worktreeBaseDir": "~/.stask/worktrees/your-project-name",
   "staleSessionMinutes": 30,
-  "syncIntervalSeconds": 120,
+  "syncIntervalSeconds": 3600,
   "maxQaRetries": 3,
+
+  "eventDaemon": {
+    "logPath": ".stask/logs/event-daemon.log",
+    "reconnect": {
+      "maxRetries": 10,
+      "baseDelayMs": 1000,
+      "maxDelayMs": 30000,
+      "jitterMs": 500
+    }
+  },
 
   "human": {
     "name": "YourName",

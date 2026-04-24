@@ -25,6 +25,7 @@ import { getSkillCount } from '../lib/setup/skills.mjs';
 import { initProject } from './init.mjs';
 import { loadManifests, getRoles, getLeadRole, generateSlackManifest } from '../lib/setup/manifest.mjs';
 import { configGet, readRawSecret } from '../lib/setup/openclaw-cli.mjs';
+import { startDaemon as startEventDaemon } from './event-daemon.mjs';
 
 // Shared step functions — used by both full wizard and --only partial mode
 import {
@@ -507,6 +508,43 @@ export async function run(args) {
   const leadName = d.leadName;
   installCtx.agents[d.leadName] = { role: 'lead' };
   stepInstall(installCtx);
+
+  // ─── Start event daemon ───────────────────────────────────────────
+  // Requires: lead's xapp- token stored in openclaw.json (Phase 4).
+  // Verifies the socket connection emits 'connected' before continuing.
+  if (!process.env.STASK_SKIP_EVENT_DAEMON) {
+    s.start('Starting Slack Socket Mode event daemon...');
+    try {
+      const eventDaemonPid = startEventDaemon();
+      // Give the daemon up to 8 seconds to connect and write a 'connected' log line
+      const staskDir = path.join(d.repoPath || process.cwd(), '.stask');
+      const logFile = path.join(staskDir, 'logs', 'event-daemon.log');
+      const WAIT_MS = 8000;
+      const POLL_MS = 300;
+      const deadline = Date.now() + WAIT_MS;
+      let connected = false;
+      while (Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, POLL_MS));
+        try {
+          const content = fs.readFileSync(logFile, 'utf-8');
+          if (content.includes('Socket Mode connected') || content.includes('daemon is live')) {
+            connected = true;
+            break;
+          }
+        } catch (_) {}
+        if (connected) break;
+      }
+      if (connected) {
+        s.stop(pc.green(`Event daemon connected (PID ${eventDaemonPid})`));
+      } else {
+        s.stop(pc.yellow(`Event daemon started (PID ${eventDaemonPid}) — connection not confirmed within ${WAIT_MS / 1000}s. Check: stask event-daemon logs`));
+      }
+    } catch (err) {
+      s.stop(pc.yellow(`Event daemon failed to start: ${err.message}. Run manually: stask event-daemon start`));
+    }
+  } else {
+    log.info(pc.dim('Skipping event daemon start (STASK_SKIP_EVENT_DAEMON).'));
+  }
 
   // OpenClaw restart
   console.log('');

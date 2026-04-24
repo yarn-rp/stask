@@ -635,9 +635,11 @@ async function runPartial({ onlySteps, detectedRepoPath }) {
 // ─── Helpers ─────────────────────────────────────────────────────
 
 function buildPlaceholders(d) {
+  const workspaceRoot = path.join(OPENCLAW_HOME, `workspace-${d.projectSlug}`);
   const p = {
     '{{PROJECT_NAME}}': d.projectName, '{{PROJECT_SLUG}}': d.projectSlug,
     '{{PROJECT_ROOT}}': d.repoPath, '{{OPENCLAW_HOME}}': OPENCLAW_HOME,
+    '{{WORKSPACE_ROOT}}': workspaceRoot,
     '{{HUMAN_NAME}}': d.humanName, '{{HUMAN_GITHUB_USERNAME}}': d.humanGithub,
     '{{HUMAN_SLACK_USER_ID}}': d.humanSlackUserId || 'UXXXXXXXXXX',
     '{{SLACK_CHANNEL_ID}}': d.slackChannelId || 'C0XXXXXXXXX',

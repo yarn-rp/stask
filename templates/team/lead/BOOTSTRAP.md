@@ -15,23 +15,23 @@ Launch all agents in parallel. Each will explore their domain and write findings
 ```js
 sessions_spawn({
   agentId: "{{BACKEND_NAME_LOWER}}",
-  cwd: "{{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{BACKEND_NAME_LOWER}}",
+  cwd: "{{WORKSPACE_ROOT}}/{{BACKEND_NAME_LOWER}}",
   runtime: "subagent",
-  task: "BOOTSTRAP EXPLORATION: Read your BOOTSTRAP.md. Explore the backend of {{PROJECT_ROOT}} via Claude Code. Write all findings to ../shared/artifacts/bootstrap-backend.md. Do NOT ask the human any questions — just explore and document."
+  task: "BOOTSTRAP EXPLORATION: Read your BOOTSTRAP.md. Explore the backend of {{PROJECT_ROOT}} via Claude Code. Write all findings to {{WORKSPACE_ROOT}}/shared/artifacts/bootstrap-backend.md. Do NOT ask the human any questions — just explore and document."
 })
 
 sessions_spawn({
   agentId: "{{FRONTEND_NAME_LOWER}}",
-  cwd: "{{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{FRONTEND_NAME_LOWER}}",
+  cwd: "{{WORKSPACE_ROOT}}/{{FRONTEND_NAME_LOWER}}",
   runtime: "subagent",
-  task: "BOOTSTRAP EXPLORATION: Read your BOOTSTRAP.md. Explore the frontend of {{PROJECT_ROOT}} via Claude Code. Write all findings to ../shared/artifacts/bootstrap-frontend.md. Do NOT ask the human any questions — just explore and document."
+  task: "BOOTSTRAP EXPLORATION: Read your BOOTSTRAP.md. Explore the frontend of {{PROJECT_ROOT}} via Claude Code. Write all findings to {{WORKSPACE_ROOT}}/shared/artifacts/bootstrap-frontend.md. Do NOT ask the human any questions — just explore and document."
 })
 
 sessions_spawn({
   agentId: "{{QA_NAME_LOWER}}",
-  cwd: "{{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{QA_NAME_LOWER}}",
+  cwd: "{{WORKSPACE_ROOT}}/{{QA_NAME_LOWER}}",
   runtime: "subagent",
-  task: "BOOTSTRAP EXPLORATION: Read your BOOTSTRAP.md. Explore the project at {{PROJECT_ROOT}} from a QA perspective via Claude Code. Try to run the project. Write all findings to ../shared/artifacts/bootstrap-qa.md. Do NOT ask the human any questions — just explore and document."
+  task: "BOOTSTRAP EXPLORATION: Read your BOOTSTRAP.md. Explore the project at {{PROJECT_ROOT}} from a QA perspective via Claude Code. Try to run the project. Write all findings to {{WORKSPACE_ROOT}}/shared/artifacts/bootstrap-qa.md. Do NOT ask the human any questions — just explore and document."
 })
 ```
 
@@ -56,9 +56,9 @@ claude -p 'Map the project at {{PROJECT_ROOT}}. Give me:
 
 Wait for all agents to finish. Then read their artifacts:
 
-- `../shared/artifacts/bootstrap-backend.md` — {{BACKEND_NAME}}'s findings
-- `../shared/artifacts/bootstrap-frontend.md` — {{FRONTEND_NAME}}'s findings
-- `../shared/artifacts/bootstrap-qa.md` — {{QA_NAME}}'s findings
+- `{{WORKSPACE_ROOT}}/shared/artifacts/bootstrap-backend.md` — {{BACKEND_NAME}}'s findings
+- `{{WORKSPACE_ROOT}}/shared/artifacts/bootstrap-frontend.md` — {{FRONTEND_NAME}}'s findings
+- `{{WORKSPACE_ROOT}}/shared/artifacts/bootstrap-qa.md` — {{QA_NAME}}'s findings
 
 Consolidate everything into a summary. Note:
 - What the team agrees on (consistent findings across agents)
@@ -93,7 +93,7 @@ Include any questions the agents flagged in their artifacts:
 
 Your context is full of exploration logs and agent artifacts at this point. Instead of writing all the shared docs here (which would bloat context further), consolidate everything into a single briefing file and hand off to a fresh session.
 
-Write `../shared/artifacts/bootstrap-briefing.md` with:
+Write `{{WORKSPACE_ROOT}}/shared/artifacts/bootstrap-briefing.md` with:
 
 ```markdown
 # Bootstrap Briefing
@@ -129,9 +129,9 @@ Write `../shared/artifacts/bootstrap-briefing.md` with:
 [Existing tech debt, fragile areas, stuff that looks wrong but is intentional]
 
 ## Agent Artifact References
-- Backend exploration: ../shared/artifacts/bootstrap-backend.md
-- Frontend exploration: ../shared/artifacts/bootstrap-frontend.md
-- QA exploration: ../shared/artifacts/bootstrap-qa.md
+- Backend exploration: {{WORKSPACE_ROOT}}/shared/artifacts/bootstrap-backend.md
+- Frontend exploration: {{WORKSPACE_ROOT}}/shared/artifacts/bootstrap-frontend.md
+- QA exploration: {{WORKSPACE_ROOT}}/shared/artifacts/bootstrap-qa.md
 ```
 
 Make the briefing self-contained. A fresh session with no prior context should be able to write all the shared docs from it.
@@ -143,42 +143,39 @@ Spawn a fresh session to do the mechanical work of writing all shared docs. This
 ```js
 sessions_spawn({
   agentId: "{{LEAD_NAME_LOWER}}",
-  cwd: "{{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{LEAD_NAME_LOWER}}",
+  cwd: "{{WORKSPACE_ROOT}}/{{LEAD_NAME_LOWER}}",
   runtime: "subagent",
   label: "bootstrap-finalize",
   task: `FINALIZE BOOTSTRAP. You have no prior context — read these files to understand what to do:
 
   Sources of truth (read ALL of these before writing):
-  1. ../shared/artifacts/bootstrap-briefing.md — consolidated briefing (human-validated answers + decisions)
-  2. ../shared/artifacts/bootstrap-backend.md — {{BACKEND_NAME}}'s deep backend exploration (data model, APIs, integrations, patterns)
-  3. ../shared/artifacts/bootstrap-frontend.md — {{FRONTEND_NAME}}'s deep frontend exploration (routing, components, styling, state)
-  4. ../shared/artifacts/bootstrap-qa.md — {{QA_NAME}}'s QA exploration (test infrastructure, critical flows, runnability)
-  5. The existing template stubs in ../shared/ (PROJECT.md, STACK.md, ARCHITECTURE.md, CONVENTIONS.md, OWNERSHIP.md, DEV.md, ENV.md, KNOWN-ISSUES.md, GIT.md)
+  1. {{WORKSPACE_ROOT}}/shared/artifacts/bootstrap-briefing.md — consolidated briefing (human-validated answers + decisions)
+  2. {{WORKSPACE_ROOT}}/shared/artifacts/bootstrap-backend.md — {{BACKEND_NAME}}'s deep backend exploration (data model, APIs, integrations, patterns)
+  3. {{WORKSPACE_ROOT}}/shared/artifacts/bootstrap-frontend.md — {{FRONTEND_NAME}}'s deep frontend exploration (routing, components, styling, state)
+  4. {{WORKSPACE_ROOT}}/shared/artifacts/bootstrap-qa.md — {{QA_NAME}}'s QA exploration (test infrastructure, critical flows, runnability)
+  5. The existing template stubs in {{WORKSPACE_ROOT}}/shared/ — these 5 files (no others):
+     README.md, AGENTS.md, STACK.md, ARCHITECTURE.md, DEV.md
 
   The briefing has the human-validated decisions (what's intentional vs. tech debt, priorities, do-not-touch). The agent artifacts have the deep technical detail. Use BOTH — briefing for the "what should we do", artifacts for the "what's actually in the code".
 
   Write each shared doc with detail pulled from the relevant artifacts:
-  - STACK.md → start from briefing, enrich with versions/details from backend + frontend artifacts
-  - ARCHITECTURE.md → pull data model from backend artifact, component/routing map from frontend artifact, key flows from all three
-  - CONVENTIONS.md → pull patterns from backend + frontend artifacts; mark tech debt per briefing
-  - OWNERSHIP.md → use "Recommended Scope" section from each agent artifact, reconcile conflicts per briefing
-  - DEV.md → start from briefing (validated commands); QA artifact tells you if it actually works
-  - ENV.md → from briefing + cross-reference with what was found in .env files during exploration
-  - KNOWN-ISSUES.md → tech debt items confirmed in briefing + any flagged in agent artifacts
-  - GIT.md → from briefing (confirmed branch strategy, PR rules)
-  - PROJECT.md → from briefing (project overview, current status, priorities)
+  - README.md → project overview + current status + priorities, from briefing
+  - STACK.md → tech stack + env vars + ownership map + known-issues log, from briefing + backend/frontend artifacts (versions, detected libs, "Recommended Scope" per agent)
+  - ARCHITECTURE.md → data model + patterns + access control + routing, from all artifacts + briefing
+  - DEV.md → Run locally + Test suite + Validate-a-feature-works (QA patterns), from briefing (validated commands) + QA artifact (actual runnability) + test-account credentials from human
+  - AGENTS.md → keep as-is (universal rules) unless briefing calls for a project-specific override in the "Code Conventions" section
 
   Replace all placeholder/template content. These files become the team's source of truth.
 
   After all shared docs are written and verified, clean up bootstrap artifacts:
-  - Delete ../shared/artifacts/bootstrap-backend.md
-  - Delete ../shared/artifacts/bootstrap-frontend.md
-  - Delete ../shared/artifacts/bootstrap-qa.md
-  - Delete ../shared/artifacts/bootstrap-briefing.md
-  - Delete {{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{LEAD_NAME_LOWER}}/BOOTSTRAP.md
-  - Delete {{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{BACKEND_NAME_LOWER}}/BOOTSTRAP.md
-  - Delete {{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{FRONTEND_NAME_LOWER}}/BOOTSTRAP.md
-  - Delete {{OPENCLAW_HOME}}/workspace-{{PROJECT_SLUG}}/{{QA_NAME_LOWER}}/BOOTSTRAP.md
+  - Delete {{WORKSPACE_ROOT}}/shared/artifacts/bootstrap-backend.md
+  - Delete {{WORKSPACE_ROOT}}/shared/artifacts/bootstrap-frontend.md
+  - Delete {{WORKSPACE_ROOT}}/shared/artifacts/bootstrap-qa.md
+  - Delete {{WORKSPACE_ROOT}}/shared/artifacts/bootstrap-briefing.md
+  - Delete {{WORKSPACE_ROOT}}/{{LEAD_NAME_LOWER}}/BOOTSTRAP.md
+  - Delete {{WORKSPACE_ROOT}}/{{BACKEND_NAME_LOWER}}/BOOTSTRAP.md
+  - Delete {{WORKSPACE_ROOT}}/{{FRONTEND_NAME_LOWER}}/BOOTSTRAP.md
+  - Delete {{WORKSPACE_ROOT}}/{{QA_NAME_LOWER}}/BOOTSTRAP.md
 
   Report back: "Bootstrap finalized. Team is ready."`
 })

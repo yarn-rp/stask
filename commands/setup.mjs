@@ -449,9 +449,10 @@ export async function run(args) {
     // Patch listId + (when available) real column/option IDs into the fresh config.
     // writeSlackIdsToConfig only rewrites keys the template declared, so passing {}
     // for columns on the 'existing' path is a safe no-op on those fields.
-    if (d.slackListId) {
+    if (d.slackListId || d.slackChannelId) {
       writeSlackIdsToConfig(path.join(staskDir, 'config.json'), {
         listId: d.slackListId,
+        channelId: d.slackChannelId,
         columns: d.slackListColumns || {},
         statusOptions: d.slackListStatusOptions || {},
         typeOptions: d.slackListTypeOptions || {},

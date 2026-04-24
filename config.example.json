@@ -61,6 +61,10 @@
       "Bug":         "OptXXXXXXXXX",
       "Improvement": "OptXXXXXXXXX",
       "Research":    "OptXXXXXXXXX"
+    },
+    "specApprovedOptions": {
+      "Approved":     "OptXXXXXXXXX",
+      "Not Approved": "OptXXXXXXXXX"
     }
   }
 }

@@ -350,6 +350,7 @@ export async function run(args) {
       d.slackListColumns = ctx.listColumns;
       d.slackListStatusOptions = ctx.listStatusOptions;
       d.slackListTypeOptions = ctx.listTypeOptions;
+      d.slackListSpecApprovedOptions = ctx.listSpecApprovedOptions;
       d.slackListAutoConfigured = true;
     } else {
       d.slackListId = '';
@@ -458,6 +459,7 @@ export async function run(args) {
         columns: d.slackListColumns || {},
         statusOptions: d.slackListStatusOptions || {},
         typeOptions: d.slackListTypeOptions || {},
+        specApprovedOptions: d.slackListSpecApprovedOptions || {},
       });
     }
 

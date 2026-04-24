@@ -353,13 +353,13 @@ export async function run(args) {
       d.slackListId = '';
     }
 
-    // Canvas → Bookmarks → Welcome (in order, with delays)
+    // Canvas → Bookmarks. Bootstrap task + welcome are deferred to the
+    // Register phase — they need the project registered in ~/.stask/projects.json
+    // first (otherwise `stask --project <slug> create` fails with "Unknown project").
     await stepCanvas(s, ctx);
     d.canvasId = ctx.canvasId;
 
     await stepBookmarks(s, ctx);
-    await stepBootstrapTask(s, ctx);
-    await stepWelcome(s, ctx);
 
     saveSetupState(state.projectSlug, state);
     completeStep(state, 'slackSetup');
@@ -478,6 +478,17 @@ export async function run(args) {
       ], { encoding: 'utf-8', timeout: 10000, env: { ...process.env, STASK_NO_DAEMON: '1' } });
       s.stop('Database ready');
     } catch { s.stop(pc.dim('Database will initialize on first command')); }
+
+    // Bootstrap task + welcome message. Deferred here so the project is
+    // registered before `stask create` runs, and so the welcome CTA can
+    // link to the freshly-created task (see slack-canvas.mjs CTA branch).
+    const postRegisterCtx = buildContext({
+      staskConfig: { agents: staskAgents, human: { slackUserId: d.humanSlackUserId }, slack: { listId: d.slackListId, channelId: d.slackChannelId } },
+      slug: d.projectSlug, repoPath: d.repoPath, leadToken: d.slackAccounts[d.agents[LEAD_ROLE.id].name]?.botToken,
+    });
+    postRegisterCtx.canvasId = d.canvasId;
+    await stepBootstrapTask(s, postRegisterCtx);
+    await stepWelcome(s, postRegisterCtx);
 
     completeStep(state, 'register');
   }

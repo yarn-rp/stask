@@ -26,6 +26,7 @@ import { initProject } from './init.mjs';
 import { loadManifests, getRoles, getLeadRole, generateSlackManifest } from '../lib/setup/manifest.mjs';
 import { configGet, readRawSecret } from '../lib/setup/openclaw-cli.mjs';
 import { startDaemon as startEventDaemon } from './event-daemon.mjs';
+import { installPersistence as installEventDaemonPersistence } from '../lib/setup/event-daemon-persist.mjs';
 
 // Shared step functions — used by both full wizard and --only partial mode
 import {
@@ -538,6 +539,22 @@ export async function run(args) {
         s.stop(pc.green(`Event daemon connected (PID ${eventDaemonPid})`));
       } else {
         s.stop(pc.yellow(`Event daemon started (PID ${eventDaemonPid}) — connection not confirmed within ${WAIT_MS / 1000}s. Check: stask event-daemon logs`));
+      }
+
+      // Install OS-level persistence (launchd on macOS, systemd on Linux)
+      s.start('Installing event daemon persistence...');
+      try {
+        const staskHome = path.join(d.repoPath || process.cwd(), '.stask');
+        const daemonScript = path.resolve(__dirname, '../bin/stask-event-daemon.mjs');
+        const persist = installEventDaemonPersistence({
+          nodeExecPath: process.execPath,
+          daemonScript,
+          staskHome,
+          slug: d.projectSlug,
+        });
+        s.stop(persist.ok ? pc.green(persist.message) : pc.yellow(persist.message));
+      } catch (err) {
+        s.stop(pc.yellow(`Persistence install failed: ${err.message}. Daemon will not auto-start on reboot.`));
       }
     } catch (err) {
       s.stop(pc.yellow(`Event daemon failed to start: ${err.message}. Run manually: stask event-daemon start`));

@@ -95,6 +95,52 @@ Config lives at `~/.stask/config.json`. See `config.example.json` for the full s
 | `agents` | Agent definitions (name, role, Slack user ID) |
 | `slack` | Slack List column IDs, status option IDs, type option IDs |
 
+## Event daemon
+
+stask ships a Slack Socket Mode event daemon that delivers Slack list changes to the local DB in ~1s (vs. the hourly drift-reconciler polling loop).
+
+```
+stask event-daemon start       # Start (detached, survives shell exit)
+stask event-daemon stop        # Stop
+stask event-daemon status      # Check if running
+stask event-daemon logs        # Tail the last 40 log lines
+```
+
+The daemon is started automatically by `stask setup` and connects using the lead agent's `xapp-` token.
+
+### Add a new event handler
+
+Three steps:
+
+1. **Create a handler file** at `lib/event-daemon/handlers/<name>.mjs`:
+
+```js
+export default {
+  eventType: 'reaction_added',   // Slack event type
+  name: 'my-handler',            // unique name for logs
+
+  match(event, ctx) {
+    return event.reaction === 'white_check_mark';
+  },
+
+  async handle(event, ctx) {
+    // ctx: { db, slackApi, logger, openclaw, config, leadName }
+    ctx.logger.info(`[my-handler] reaction: ${event.reaction}`);
+  },
+};
+```
+
+2. **Register it** in `lib/event-daemon/registry.mjs`:
+
+```js
+import myHandler from './handlers/my-handler.mjs';
+export const HANDLERS = [ listReconcile, myHandler ];
+```
+
+3. **Add the event type** to `templates/team/lead/manifest.json` under `settings.event_subscriptions.bot_events`, then reinstall the Slack app via `stask setup --only verify`.
+
+Handlers are isolated: if one throws, sibling handlers still run.
+
 ## License
 
 MIT

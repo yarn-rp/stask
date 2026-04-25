@@ -105,6 +105,7 @@ const COMMANDS = {
   'assign':         () => import('../commands/assign.mjs'),
   'sync':           () => import('../commands/sync.mjs'),
   'sync-daemon':    () => import('../commands/sync-daemon.mjs'),
+  'event-daemon':   () => import('../commands/event-daemon.mjs'),
   // Multi-project commands (also handled as NO_PROJECT_COMMANDS above for init/projects/heartbeat-all)
   'heartbeat-all':  () => import('../commands/heartbeat-all.mjs'),
 };
@@ -185,8 +186,9 @@ Read-only commands:
   session claim|release|status <task-id> [--agent X] [--session-id Y]
 
 Sync commands:
-  sync                          Run one bidirectional sync cycle
-  sync-daemon start|stop|status Manage background sync daemon
+  sync                            Run one bidirectional sync cycle
+  sync-daemon start|stop|status   Manage background drift-reconciler daemon
+  event-daemon start|stop|status|logs  Manage Slack Socket Mode event daemon
 
 Multi-project commands:
   init <name> --repo <path>     Create a new stask project

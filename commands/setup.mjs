@@ -103,6 +103,8 @@ export async function run(args) {
   // ── Parse args ────────────────────────────────────────────────
   let argPath = null;
   let onlySteps = null;
+  let headless = false;
+  let cliSlackUserId = null;
   const agentFlags = []; // { roleId, name, botToken, appToken }
   const validRoleIds = ROLES.map((r) => r.id);
 
@@ -114,10 +116,68 @@ export async function run(args) {
       try { agentFlags.push(parseAgentFlag(args[i + 1], validRoleIds)); }
       catch (err) { console.error(err.message); process.exit(1); }
       i++;
+    } else if (args[i] === '--slack-user-id' && args[i + 1]) {
+      cliSlackUserId = args[++i];
+    } else if (args[i] === '--yes' || args[i] === '-y') {
+      headless = true;
     } else if (!args[i].startsWith('--')) {
       argPath = args[i];
     }
   }
+
+  // ── Headless preflight ───────────────────────────────────────
+  // In --yes mode every prompt with a default auto-accepts. Inputs
+  // without defaults must be provided as flags up-front — fail early
+  // with a clear message rather than mid-wizard.
+  if (headless) {
+    const missing = [];
+    if (!argPath) missing.push('positional path (e.g. `stask setup .`)');
+    if (!cliSlackUserId) missing.push('--slack-user-id <U…>');
+    if (agentFlags.length < ROLES.length) {
+      const provided = new Set(agentFlags.map((a) => a.roleId));
+      const need = validRoleIds.filter((r) => !provided.has(r));
+      missing.push(`--agent for role(s): ${need.join(', ')}`);
+    }
+    if (cliSlackUserId && !/^U[A-Z0-9]+$/i.test(cliSlackUserId)) {
+      console.error(`--slack-user-id must be a Slack user ID like U0AQSE3NG75 (got "${cliSlackUserId}")`);
+      process.exit(1);
+    }
+    if (missing.length > 0) {
+      console.error('--yes requires:');
+      for (const m of missing) console.error(`  - ${m}`);
+      process.exit(1);
+    }
+  }
+
+  // ── Auto-accept wrappers ─────────────────────────────────────
+  // In headless mode these short-circuit: text/confirm return their
+  // initialValue (which is the default for that prompt), select returns
+  // the first option's value (which is the default in every existing
+  // wizard select). Interactive mode falls through to the real prompt.
+  const autoText = async (opts) => {
+    if (headless) {
+      // Prefer an explicit headless-only default (e.g. for prompts that
+      // shouldn't pre-fill in interactive mode), else fall back to the
+      // shared initialValue.
+      const v = opts.headlessDefault ?? opts.initialValue;
+      if (v === undefined || v === null || v === '') {
+        bail(`--yes requires a value for: "${opts.message}". Provide the appropriate flag.`);
+      }
+      return v;
+    }
+    const { headlessDefault, ...rest } = opts;
+    return await text(rest);
+  };
+  const autoConfirm = async (opts) => headless ? (opts.initialValue ?? true) : await confirm(opts);
+  const autoSelect = async (opts) => {
+    if (headless) {
+      // Prefer an explicit value match (e.g. 'create') if present, else
+      // fall back to the first option. Every wizard select today places
+      // the default first, so this is safe.
+      return opts.options[0].value;
+    }
+    return await select(opts);
+  };
 
   // Reject duplicate roles in --agent flags.
   const seenRoles = new Set();
@@ -176,22 +236,22 @@ export async function run(args) {
   log.info(pc.dim('We\'ll create an OpenClaw workspace, 4 AI agents, connect them to Slack,'));
   log.info(pc.dim('and set up a stask project to track tasks.\n'));
 
-  const projectName = guard(await text({ message: 'Project name', placeholder: 'my-saas', initialValue: detectedProjectName || '', validate: (v) => !v ? 'Required' : undefined }));
+  const projectName = guard(await autoText({ message: 'Project name', placeholder: 'my-saas', initialValue: detectedProjectName || '', validate: (v) => !v ? 'Required' : undefined }));
   const projectSlug = projectName.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
-  const absRepoPath = guard(await text({ message: 'Repo path', initialValue: detectedRepoPath || '', validate: (v) => { if (!v) return 'Required'; if (!fs.existsSync(path.resolve(v))) return 'Path does not exist'; } })).trim();
+  const absRepoPath = guard(await autoText({ message: 'Repo path', initialValue: detectedRepoPath || '', validate: (v) => { if (!v) return 'Required'; if (!fs.existsSync(path.resolve(v))) return 'Path does not exist'; } })).trim();
   const resolvedRepoPath = path.resolve(absRepoPath);
 
   const existingState = loadSetupState(projectSlug);
   let state;
   if (existingState) {
-    const resume = guard(await confirm({ message: 'Found incomplete setup. Resume?' }));
+    const resume = guard(await autoConfirm({ message: 'Found incomplete setup. Resume?', initialValue: false }));
     state = resume ? existingState : createState(projectSlug);
   } else {
     state = createState(projectSlug);
   }
 
-  const humanName = guard(await text({ message: 'Your name', initialValue: ghName }));
-  const humanGithub = guard(await text({ message: 'GitHub username', initialValue: ghUser }));
+  const humanName = guard(await autoText({ message: 'Your name', initialValue: ghName }));
+  const humanGithub = guard(await autoText({ message: 'GitHub username', initialValue: ghUser }));
   Object.assign(state.data, { projectName, projectSlug, repoPath: resolvedRepoPath, humanName, humanGithub });
   completeStep(state, 'basics');
 
@@ -241,9 +301,10 @@ export async function run(args) {
     for (const role of ROLES) {
       if (!state.data.agents[role.id]) state.data.agents[role.id] = {};
       if (!state.data.agents[role.id].name) {
-        state.data.agents[role.id].name = guard(await text({
+        state.data.agents[role.id].name = guard(await autoText({
           message: `${role.title} \u2014 ${role.description}`,
           placeholder: `e.g. ${role.id}`,
+          headlessDefault: role.id, // --yes only; interactive prompt stays blank
           validate: validateAgentName,
         })).toLowerCase();
       }
@@ -270,7 +331,7 @@ export async function run(args) {
     });
     note(modelLines.join('\n'), 'Recommended models');
 
-    const useDefaults = guard(await confirm({ message: 'Use these models?' }));
+    const useDefaults = guard(await autoConfirm({ message: 'Use these models?', initialValue: true }));
     for (const role of ROLES) {
       const m = AGENT_MANIFESTS[role.id].model;
       if (useDefaults) {
@@ -295,7 +356,7 @@ export async function run(args) {
 
     const targetDir = path.join(OPENCLAW_HOME, `workspace-${d.projectSlug}`);
     if (fs.existsSync(targetDir)) {
-      const overwrite = guard(await confirm({ message: 'Workspace exists. Overwrite?', initialValue: false }));
+      const overwrite = guard(await autoConfirm({ message: 'Workspace exists. Overwrite?', initialValue: false }));
       if (!overwrite) bail('Aborted.');
       fs.rmSync(targetDir, { recursive: true });
     }
@@ -377,10 +438,11 @@ export async function run(args) {
 
     const leadToken = d.slackAccounts[d.agents[LEAD_ROLE.id].name]?.botToken;
 
-    // Human Slack user ID
-    d.humanSlackUserId = guard(await text({
+    // Human Slack user ID — pre-filled from --slack-user-id when given
+    d.humanSlackUserId = guard(await autoText({
       message: 'Your Slack user ID (Profile \u2192 \u22ee \u2192 Copy member ID)',
       placeholder: 'U0XXXXXXXXX',
+      initialValue: cliSlackUserId || '',
       validate: (v) => (!v || !v.startsWith('U')) ? 'Must start with U' : undefined,
     }));
 
@@ -407,7 +469,7 @@ export async function run(args) {
     };
 
     // Channel
-    const channelChoice = guard(await select({
+    const channelChoice = guard(await autoSelect({
       message: 'Project Slack channel',
       options: [
         { value: 'create', label: `Create #${d.projectSlug}-project`, hint: 'New channel with all agents invited' },
@@ -423,7 +485,7 @@ export async function run(args) {
     d.slackChannelId = ctx.channelId;
 
     // List
-    const listChoice = guard(await select({
+    const listChoice = guard(await autoSelect({
       message: 'Project task board (Slack List)',
       options: [
         { value: 'create', label: 'Create new List', hint: 'Auto-creates all 14 columns + status/type options' },
@@ -477,7 +539,11 @@ export async function run(args) {
       slug: d.projectSlug, repoPath: d.repoPath, leadToken: d.slackAccounts[d.agents[LEAD_ROLE.id].name]?.botToken,
     });
 
-    await stepInbox(s, inboxCtx);
+    if (headless) {
+      log.info(pc.dim('Skipping inbox setup in --yes mode. Configure later with `stask inbox subscribe`.'));
+    } else {
+      await stepInbox(s, inboxCtx);
+    }
 
     saveSetupState(state.projectSlug, state);
     completeStep(state, 'inbox');
@@ -665,7 +731,7 @@ export async function run(args) {
   if (process.env.STASK_SKIP_GATEWAY_RESTART) {
     log.info(pc.dim('Skipping gateway restart (STASK_SKIP_GATEWAY_RESTART).'));
   } else {
-    const shouldRestart = guard(await confirm({ message: 'Restart OpenClaw gateway to load your new agents?' }));
+    const shouldRestart = guard(await autoConfirm({ message: 'Restart OpenClaw gateway to load your new agents?', initialValue: true }));
     if (shouldRestart) {
       s.start('Restarting OpenClaw gateway...');
       try {

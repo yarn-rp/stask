@@ -57,7 +57,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATE_DIR = path.resolve(__dirname, '../templates/team');
 const OPENCLAW_HOME = path.join(process.env.HOME || '', '.openclaw');
 
-const STEPS = ['Project', 'Team', 'Models', 'Build', 'Slack Apps', 'Slack Setup', 'Register', 'Install'];
+const STEPS = ['Project', 'Team', 'Models', 'Build', 'Slack Apps', 'Slack Setup', 'Register', 'Install', 'Bootstrap'];
 
 // Load manifests from template directory — the source of truth for team config
 const { team: TEAM_MANIFEST, agents: AGENT_MANIFESTS } = loadManifests(TEMPLATE_DIR);
@@ -641,18 +641,6 @@ export async function run(args) {
       s.stop('Database ready');
     } catch { s.stop(pc.dim('Database will initialize on first command')); }
 
-    // Bootstrap task + welcome message. Deferred here so the project is
-    // registered before `stask create` runs, and so the welcome CTA can
-    // link to the freshly-created task (see slack-canvas.mjs CTA branch).
-    const postRegisterCtx = buildContext({
-      staskConfig: { agents: staskAgents, human: { slackUserId: d.humanSlackUserId }, slack: { listId: d.slackListId, channelId: d.slackChannelId } },
-      slug: d.projectSlug, repoPath: d.repoPath, leadToken: d.slackAccounts[d.agents[LEAD_ROLE.id].name]?.botToken,
-    });
-    postRegisterCtx.canvasId = d.canvasId;
-    await stepActivateListChannel(s, postRegisterCtx);
-    await stepBootstrapTask(s, postRegisterCtx);
-    await stepWelcome(s, postRegisterCtx);
-
     completeStep(state, 'register');
   }
 
@@ -725,6 +713,31 @@ export async function run(args) {
   } else {
     log.info(pc.dim('Skipping event daemon start (STASK_SKIP_EVENT_DAEMON).'));
   }
+
+  // ═══ PHASE 8 — Bootstrap (activate list channel + bootstrap task + welcome) ═══
+  // Separated from Install so the user-facing manual handshake
+  // (one-time list-channel activation in Slack UI) is its own labeled
+  // phase in the progress bar, not buried inside install verification.
+  phase(8);
+  log.info(pc.dim('Activating list comment channel and creating the first task.\n'));
+
+  // Build a fresh staskAgents map — the version from the Register phase
+  // is scoped to that block. Same shape, derived from `d.agents`.
+  const bootstrapAgents = {};
+  for (const role of ROLES) {
+    const name = d.agents[role.id].name;
+    const staskRole = role.id === 'lead' ? 'lead' : role.id === 'qa' ? 'qa' : 'worker';
+    bootstrapAgents[name] = { role: staskRole, slackUserId: d.slackAccounts[name]?.userId || 'UXXXXXXXXXX' };
+  }
+
+  const bootstrapCtx = buildContext({
+    staskConfig: { agents: bootstrapAgents, human: { slackUserId: d.humanSlackUserId }, slack: { listId: d.slackListId, channelId: d.slackChannelId } },
+    slug: d.projectSlug, repoPath: d.repoPath, leadToken: d.slackAccounts[d.agents[LEAD_ROLE.id].name]?.botToken,
+  });
+  bootstrapCtx.canvasId = d.canvasId;
+  await stepActivateListChannel(s, bootstrapCtx);
+  await stepBootstrapTask(s, bootstrapCtx);
+  await stepWelcome(s, bootstrapCtx);
 
   // OpenClaw restart
   console.log('');

@@ -197,6 +197,8 @@ Multi-project commands:
 
 Team bootstrap commands:
   setup [path]                  Interactive wizard: scaffold workspace, Slack apps, cron, openclaw.json
+                                Add --agent <role>:<name>:<bot>:<app> (repeatable) to skip prompts for a role
+                                Add --yes (with all --agent + --slack-user-id) to accept every default and run headless
   teardown <slug> [--force]     Remove workspace, agents, cron jobs, and .stask/ for a project
   doctor [--json]               Check stask/OpenClaw config for known failure modes (announce timeouts, bind mode, clobbered snapshots)
   update [--check] [--dry-run]  Upgrade stask to the latest version on npm

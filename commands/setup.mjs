@@ -34,7 +34,7 @@ import { configGet, readRawSecret } from '../lib/setup/openclaw-cli.mjs';
 
 // Shared step functions — used by both full wizard and --only partial mode
 import {
-  stepChannel, stepList, stepCanvas, stepBookmarks, stepWelcome,
+  stepChannel, stepList, stepCanvas, stepBookmarks, stepWelcome, stepActivateListChannel,
   stepSkills, stepCron, stepOpenclaw, stepInstall, stepInbox, stepClaudeSubagents,
   stepBootstrapTask,
   buildContext, getWorkspaceInfo,
@@ -496,6 +496,7 @@ export async function run(args) {
       slug: d.projectSlug, repoPath: d.repoPath, leadToken: d.slackAccounts[d.agents[LEAD_ROLE.id].name]?.botToken,
     });
     postRegisterCtx.canvasId = d.canvasId;
+    await stepActivateListChannel(s, postRegisterCtx);
     await stepBootstrapTask(s, postRegisterCtx);
     await stepWelcome(s, postRegisterCtx);
 
@@ -741,7 +742,10 @@ async function runPartial({ onlySteps, detectedRepoPath }) {
   // which stepBootstrapTask populates. The previous order (welcome first,
   // bootstrap later) meant `--only bootstrap,welcome` always tripped the
   // taskThreadUrl-missing guard and never reached bootstrap.
-  if (onlySteps.has('bootstrap'))  await stepBootstrapTask(s, ctx);
+  if (onlySteps.has('bootstrap')) {
+    await stepActivateListChannel(s, ctx);
+    await stepBootstrapTask(s, ctx);
+  }
 
   if (onlySteps.has('welcome')) {
     // If bootstrap wasn't also requested, look up the thread from an

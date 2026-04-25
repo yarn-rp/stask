@@ -25,8 +25,12 @@ import { getSkillCount } from '../lib/setup/skills.mjs';
 import { initProject } from './init.mjs';
 import { loadManifests, getRoles, getLeadRole, generateSlackManifest } from '../lib/setup/manifest.mjs';
 import { configGet, readRawSecret } from '../lib/setup/openclaw-cli.mjs';
-import { startDaemon as startEventDaemon } from './event-daemon.mjs';
-import { installPersistence as installEventDaemonPersistence } from '../lib/setup/event-daemon-persist.mjs';
+// NOTE: ./event-daemon.mjs imports lib/env.mjs at the top level, which calls
+// resolveProjectRoot() and fails with "No stask project found" when run from a
+// directory without .stask/. Setup is supposed to bypass that resolution
+// entirely (it's in NO_PROJECT_COMMANDS in bin/stask.mjs). Load these lazily
+// inside the function body so importing this module does not eagerly trigger
+// project resolution.
 
 // Shared step functions — used by both full wizard and --only partial mode
 import {
@@ -518,6 +522,9 @@ export async function run(args) {
   if (!process.env.STASK_SKIP_EVENT_DAEMON) {
     s.start('Starting Slack Socket Mode event daemon...');
     try {
+      // Lazy import — see comment near the top of this file.
+      const { startDaemon: startEventDaemon } = await import('./event-daemon.mjs');
+      const { installPersistence: installEventDaemonPersistence } = await import('../lib/setup/event-daemon-persist.mjs');
       const eventDaemonPid = startEventDaemon();
       // Give the daemon up to 8 seconds to connect and write a 'connected' log line
       const staskDir = path.join(d.repoPath || process.cwd(), '.stask');

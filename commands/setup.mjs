@@ -3,6 +3,19 @@
  *
  * Usage: stask setup [path]
  *        stask setup [path] --only channel,list,canvas,bookmark,welcome,skills,cron,openclaw,verify,inbox
+ *        stask setup [path] --agent <role>:<name>:<bot-token>:<app-token> [--agent ...]
+ *
+ * --agent pre-loads a role's agent name + Slack tokens for this run so the
+ * wizard skips the team-naming prompt and the Slack-app token prompt for
+ * that role. Repeat the flag for each role you want to preload (any roles
+ * not provided still prompt interactively).
+ *
+ * Example:
+ *   stask setup . \
+ *     --agent lead:professor:xoxb-...:xapp-... \
+ *     --agent backend:berlin:xoxb-...:xapp-... \
+ *     --agent frontend:tokyo:xoxb-...:xapp-... \
+ *     --agent qa:helsinki:xoxb-...:xapp-...
  */
 
 import fs from 'node:fs';
@@ -58,18 +71,62 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 function capitalize(s) { return s ? s[0].toUpperCase() + s.slice(1) : s; }
 function validateAgentName(v) { if (!v) return 'Required'; if (!/^[a-z0-9-]+$/i.test(v)) return 'Letters, numbers, and hyphens only'; }
 
+/**
+ * Parse one `--agent <role>:<name>:<bot>:<app>` value. Returns
+ * { roleId, name, botToken, appToken } or throws on invalid input.
+ */
+function parseAgentFlag(value, validRoleIds) {
+  // Split into 4 parts on the first 3 colons. Tokens themselves don't
+  // contain colons (xoxb-/xapp- + alphanumeric/hyphens only) so a fixed
+  // split is safe.
+  const parts = value.split(':');
+  if (parts.length !== 4) {
+    throw new Error(`--agent expects role:name:bot-token:app-token (got "${value}")`);
+  }
+  const [roleId, name, botToken, appToken] = parts.map((p) => p.trim());
+  if (!validRoleIds.includes(roleId)) {
+    throw new Error(`--agent: unknown role "${roleId}". Valid: ${validRoleIds.join(', ')}`);
+  }
+  if (!/^[a-z0-9-]+$/i.test(name)) {
+    throw new Error(`--agent: invalid name "${name}" (letters, numbers, hyphens only)`);
+  }
+  if (!botToken.startsWith('xoxb-')) {
+    throw new Error(`--agent (${roleId}): bot token must start with xoxb-`);
+  }
+  if (!appToken.startsWith('xapp-')) {
+    throw new Error(`--agent (${roleId}): app token must start with xapp-`);
+  }
+  return { roleId, name: name.toLowerCase(), botToken, appToken };
+}
+
 export async function run(args) {
   // ── Parse args ────────────────────────────────────────────────
   let argPath = null;
   let onlySteps = null;
+  const agentFlags = []; // { roleId, name, botToken, appToken }
+  const validRoleIds = ROLES.map((r) => r.id);
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--only' && args[i + 1]) {
       onlySteps = new Set(args[i + 1].split(',').map((s) => s.trim()));
       i++;
+    } else if (args[i] === '--agent' && args[i + 1]) {
+      try { agentFlags.push(parseAgentFlag(args[i + 1], validRoleIds)); }
+      catch (err) { console.error(err.message); process.exit(1); }
+      i++;
     } else if (!args[i].startsWith('--')) {
       argPath = args[i];
     }
+  }
+
+  // Reject duplicate roles in --agent flags.
+  const seenRoles = new Set();
+  for (const a of agentFlags) {
+    if (seenRoles.has(a.roleId)) {
+      console.error(`--agent: duplicate role "${a.roleId}". Provide each role at most once.`);
+      process.exit(1);
+    }
+    seenRoles.add(a.roleId);
   }
 
   let detectedRepoPath = null;
@@ -137,6 +194,36 @@ export async function run(args) {
   const humanGithub = guard(await text({ message: 'GitHub username', initialValue: ghUser }));
   Object.assign(state.data, { projectName, projectSlug, repoPath: resolvedRepoPath, humanName, humanGithub });
   completeStep(state, 'basics');
+
+  // ── Apply --agent flags ──────────────────────────────────────
+  // Pre-populate agent names + verified Slack tokens so Phase 1 (Team
+  // Naming) and Phase 4 (Slack Apps) skip the prompts for these roles.
+  // Anything not provided still prompts interactively.
+  if (agentFlags.length > 0) {
+    if (!state.data.agents) state.data.agents = {};
+    if (!state.data.slackAccounts) state.data.slackAccounts = {};
+    for (const a of agentFlags) {
+      // Verify the bot token before adopting it — fail fast on bad input.
+      s.start(`Verifying --agent ${a.roleId}:${a.name}...`);
+      const v = await verifyToken(a.botToken);
+      if (!v.ok) {
+        s.stop(pc.red(`--agent ${a.roleId}:${a.name} bot token failed: ${v.error}`));
+        bail('Fix the token and re-run.');
+      }
+      s.stop(`${pc.green('\u2713')} ${pc.bold(capitalize(a.name))} ${pc.dim(`(${a.roleId})`)} verified ${pc.dim(`(${v.userId})`)}`);
+
+      if (!state.data.agents[a.roleId]) state.data.agents[a.roleId] = {};
+      state.data.agents[a.roleId].name = a.name;
+      state.data[`${a.roleId}Name`] = a.name;
+      state.data.slackAccounts[a.name] = {
+        botToken: a.botToken,
+        appToken: a.appToken,
+        userId: v.userId,
+        botName: v.botName,
+      };
+    }
+    saveSetupState(state.projectSlug, state);
+  }
 
   process.on('SIGINT', () => {
     saveSetupState(state.projectSlug, state);

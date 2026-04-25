@@ -45,7 +45,7 @@ import { fileURLToPath } from 'url';
 }
 
 // Commands that don't need a project context (work with global registry only)
-const NO_PROJECT_COMMANDS = new Set(['init', 'projects', 'heartbeat-all', 'setup', 'teardown', 'doctor', 'update']);
+const NO_PROJECT_COMMANDS = new Set(['init', 'projects', 'heartbeat-all', 'setup', 'teardown', 'doctor', 'update', 'slack-apps']);
 
 const _cmd = process.argv[2];
 if (NO_PROJECT_COMMANDS.has(_cmd)) {
@@ -200,6 +200,7 @@ Team bootstrap commands:
   teardown <slug> [--force]     Remove workspace, agents, cron jobs, and .stask/ for a project
   doctor [--json]               Check stask/OpenClaw config for known failure modes (announce timeouts, bind mode, clobbered snapshots)
   update [--check] [--dry-run]  Upgrade stask to the latest version on npm
+  slack-apps set|list|verify    Pre-register agent Slack tokens so setup skips the prompt
 
 Global flags:
   --project <name>              Target a specific project (otherwise auto-detected from cwd)

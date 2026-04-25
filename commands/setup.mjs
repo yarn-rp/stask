@@ -255,29 +255,57 @@ export async function run(args) {
       log.info(pc.dim('Each agent needs its own Slack app for independent messaging.\n'));
       log.info(`Setting up app ${pc.bold(`${done + 1}`)} of ${pc.bold(String(ROLES.length))}: ${pc.bold(capitalize(name))} ${pc.dim(`(${roleId})`)}\n`);
 
-      const manifest = generateSlackManifest(AGENT_MANIFESTS[roleId], capitalize(name));
-      await showCopyable(manifest, `Manifest for ${pc.bold(capitalize(name))}`, `${name}-manifest.json`);
+      // Reuse already-registered tokens from openclaw config (e.g. pre-loaded
+      // via `stask slack-apps set <name> --bot-token ... --app-token ...`).
+      // Only adopt them if the bot token still verifies — otherwise fall
+      // through to the interactive prompt.
+      let botToken;
+      let appToken;
+      let verified;
+      try {
+        const existingBot = readRawSecret(`channels.slack.accounts.${name}.botToken`);
+        const existingApp = readRawSecret(`channels.slack.accounts.${name}.appToken`);
+        if (existingBot && existingApp) {
+          s.start(`Reusing stored Slack tokens for ${capitalize(name)}...`);
+          const v = await verifyToken(existingBot);
+          if (v.ok) {
+            s.stop(`${pc.green('\u2713')} ${pc.bold(capitalize(name))} reused ${pc.dim(`(${v.userId})`)}`);
+            botToken = existingBot;
+            appToken = existingApp;
+            verified = v;
+          } else {
+            s.stop(pc.yellow(`Stored token failed verification (${v.error}) — re-prompting.`));
+          }
+        }
+      } catch {}
 
-      log.info([
-        '',
-        `${pc.bold('1.')} Open ${link('Slack Apps', 'https://api.slack.com/apps')} ${pc.dim('\u2192')} ${pc.cyan('"Create New App" \u2192 "From an app manifest"')}`,
-        `${pc.bold('2.')} Select your workspace and paste (it's on your clipboard)`,
-        `${pc.bold('3.')} Create & install the app`,
-        `${pc.bold('4.')} Copy ${pc.bold('Bot Token')} from ${pc.cyan('OAuth & Permissions \u2192 Bot User OAuth Token')}`,
-        `${pc.bold('5.')} Create ${pc.bold('App Token')} at ${pc.cyan('Basic Information \u2192 App-Level Tokens')}`,
-        `     ${pc.dim('Click "Generate Token", add')} ${pc.cyan('connections:write')} ${pc.dim('scope, copy it')}`,
-        '',
-      ].join('\n'));
+      if (!botToken || !appToken) {
+        const manifest = generateSlackManifest(AGENT_MANIFESTS[roleId], capitalize(name));
+        await showCopyable(manifest, `Manifest for ${pc.bold(capitalize(name))}`, `${name}-manifest.json`);
 
-      const botToken = guard(await text({ message: 'Bot Token', placeholder: 'xoxb-...', validate: (v) => !v?.startsWith('xoxb-') ? 'Must start with xoxb-' : undefined }));
-      const appToken = guard(await text({ message: 'App Token', placeholder: 'xapp-...', validate: (v) => !v?.startsWith('xapp-') ? 'Must start with xapp-' : undefined }));
+        log.info([
+          '',
+          `${pc.bold('1.')} Open ${link('Slack Apps', 'https://api.slack.com/apps')} ${pc.dim('\u2192')} ${pc.cyan('"Create New App" \u2192 "From an app manifest"')}`,
+          `${pc.bold('2.')} Select your workspace and paste (it's on your clipboard)`,
+          `${pc.bold('3.')} Create & install the app`,
+          `${pc.bold('4.')} Copy ${pc.bold('Bot Token')} from ${pc.cyan('OAuth & Permissions \u2192 Bot User OAuth Token')}`,
+          `${pc.bold('5.')} Create ${pc.bold('App Token')} at ${pc.cyan('Basic Information \u2192 App-Level Tokens')}`,
+          `     ${pc.dim('Click "Generate Token", add')} ${pc.cyan('connections:write')} ${pc.dim('scope, copy it')}`,
+          '',
+          pc.dim(`     Tip: pre-register with ${pc.cyan(`stask slack-apps set ${name} --bot-token ... --app-token ...`)} to skip these prompts on the next setup.`),
+          '',
+        ].join('\n'));
 
-      s.start('Verifying token...');
-      const result = await verifyToken(botToken);
-      if (!result.ok) { s.stop(pc.red(`Failed: ${result.error}`)); bail('Fix the token and re-run to resume.'); }
-      s.stop(`${pc.green('\u2713')} ${pc.bold(capitalize(name))} verified ${pc.dim(`(${result.userId})`)}`);
+        botToken = guard(await text({ message: 'Bot Token', placeholder: 'xoxb-...', validate: (v) => !v?.startsWith('xoxb-') ? 'Must start with xoxb-' : undefined }));
+        appToken = guard(await text({ message: 'App Token', placeholder: 'xapp-...', validate: (v) => !v?.startsWith('xapp-') ? 'Must start with xapp-' : undefined }));
 
-      d.slackAccounts[name] = { botToken, appToken, userId: result.userId, botName: result.botName };
+        s.start('Verifying token...');
+        verified = await verifyToken(botToken);
+        if (!verified.ok) { s.stop(pc.red(`Failed: ${verified.error}`)); bail('Fix the token and re-run to resume.'); }
+        s.stop(`${pc.green('\u2713')} ${pc.bold(capitalize(name))} verified ${pc.dim(`(${verified.userId})`)}`);
+      }
+
+      d.slackAccounts[name] = { botToken, appToken, userId: verified.userId, botName: verified.botName };
       saveSetupState(state.projectSlug, state);
     }
     completeStep(state, 'slack');

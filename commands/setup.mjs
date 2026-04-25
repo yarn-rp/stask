@@ -488,16 +488,15 @@ export async function run(args) {
       s.stop('Database ready');
     } catch { s.stop(pc.dim('Database will initialize on first command')); }
 
-    // Bootstrap task + welcome message. Deferred here so the project is
-    // registered before `stask create` runs, and so the welcome CTA can
-    // link to the freshly-created task (see slack-canvas.mjs CTA branch).
-    const postRegisterCtx = buildContext({
-      staskConfig: { agents: staskAgents, human: { slackUserId: d.humanSlackUserId }, slack: { listId: d.slackListId, channelId: d.slackChannelId } },
-      slug: d.projectSlug, repoPath: d.repoPath, leadToken: d.slackAccounts[d.agents[LEAD_ROLE.id].name]?.botToken,
+    // Bootstrap task + welcome message. Delegate to runPartial so this
+    // path uses the *exact* same code as `stask setup --only bootstrap,welcome`:
+    // read .stask/config.json from disk, resolve lead token via readRawSecret,
+    // build ctx the same way, run the same step functions. One source of truth
+    // for bootstrap orchestration; no in-memory ctx variant to drift apart.
+    await runPartial({
+      onlySteps: new Set(['bootstrap', 'welcome']),
+      detectedRepoPath: d.repoPath,
     });
-    postRegisterCtx.canvasId = d.canvasId;
-    await stepBootstrapTask(s, postRegisterCtx);
-    await stepWelcome(s, postRegisterCtx);
 
     completeStep(state, 'register');
   }

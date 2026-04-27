@@ -131,13 +131,6 @@ Do NOT create subtasks. Do NOT transition status. Do NOT write code.`;
             .filter(([, a]) => a.role === 'worker')
             .map(([n]) => n.charAt(0).toUpperCase() + n.slice(1));
           prompt = `Task ${taskId} "${task['Task Name']}" spec has been approved. Create subtasks and delegate to the appropriate builders (${workers.join(', ')}). Spec file ID: ${specFileId}. After creating subtasks, transition the parent to In-Progress.`;
-        } else if (status === 'To-Do' && hasSubtasks && !isSubtask) {
-          // Approved parent already has its full subtask plan (e.g. bootstrap,
-          // or any spec that defined subtasks up front). Don't ask the lead to
-          // re-plan — just kick off execution: transition the parent so
-          // workers can pick up their subtasks.
-          action = 'kickoff';
-          prompt = `Task ${taskId} "${task['Task Name']}" spec has been approved and subtasks are already defined. Do NOT create new subtasks. Run \`stask transition ${taskId} In-Progress\` to start the work. Workers will pick up their assigned subtasks on the next heartbeat.`;
         } else if (status === 'Testing' && !isSubtask) {
           action = 'create-pr';
           const wt = libs.trackerDb.getParentWorktree(taskId);

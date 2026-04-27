@@ -9,7 +9,6 @@
 import { CONFIG, getWorkspaceLibs } from '../lib/env.mjs';
 import { withDb } from '../lib/tx.mjs';
 import { getThreadRef } from '../lib/slack-row.mjs';
-import { isTaskClaimable } from '../lib/session-tracker.mjs';
 import { getLeadAgent } from '../lib/roles.mjs';
 
 export async function run(argv) {
@@ -31,15 +30,22 @@ export async function run(argv) {
   const agentRole = agentConfig.role;
 
   const result = await withDb((db, libs) => {
-    const allTasks = libs.trackerDb.getAllTasks();
-    const myTasks = allTasks.filter(t => t['Assigned To'] === agentDisplayName);
+    const myTasks = libs.trackerDb.getTasksByAssignee(agentDisplayName);
 
     if (myTasks.length === 0) {
-      return { agent: agentName, pendingTasks: [], inboxItems: [], config: { staleSessionMinutes: CONFIG.staleSessionMinutes } };
+      return {
+        agent: agentName,
+        pendingTasks: [],
+        assignedOpen: { count: 0, tasks: [] },
+        inboxItems: [],
+        config: { staleSessionMinutes: CONFIG.staleSessionMinutes },
+      };
     }
 
     const pendingTasks = [];
     const workerSubtaskQueue = [];
+    // Track which task IDs got a rich-prompt entry so the resume pass can skip them.
+    const handledTaskIds = new Set();
 
     for (const task of myTasks) {
       const taskId = task['Task ID'];
@@ -49,8 +55,9 @@ export async function run(argv) {
 
       if (status === 'Done' || status === 'Blocked') continue;
 
-      // Session awareness: skip if claimed by another agent's live session
-      if (!isTaskClaimable(db, taskId, agentName)) continue;
+      // Liveness is the consumer's job: HEARTBEAT.md filters via OpenClaw
+      // sessions_list(activeMinutes=10) on label `pipeline:<taskId>`. Heartbeat
+      // surfaces every open task; the consumer decides whether to spawn.
 
       const specParsed = libs.validate.parseSpecValue(task['Spec']);
       const specFileId = specParsed?.fileId || 'unknown';
@@ -135,6 +142,7 @@ The PR description is what Yan sees first. Make it count.`;
         const threadRef = getThreadRef(db, isSubtask ? task['Parent'] : taskId);
         const thread = threadRef ? { channelId: threadRef.channelId, threadTs: threadRef.threadTs } : null;
         pendingTasks.push({ taskId, taskName: task['Task Name'], status, parent: task['Parent'], specFileId, action, prompt, thread });
+        handledTaskIds.add(taskId);
       }
     }
 
@@ -201,6 +209,7 @@ IMPORTANT: Complete subtasks sequentially. Commit, push, and mark done after EAC
             prompt: `Build subtask ${s.task['Task ID']}: "${s.task['Task Name']}". Spec file ID: ${s.specFileId}. Read the spec from shared/specs/ for full details.${singleWt}\nWhen complete, run: npx @web42/stask subtask done ${s.task['Task ID']}`,
             thread,
           });
+          handledTaskIds.add(s.task['Task ID']);
         } else {
           pendingTasks.push({
             taskId: parentId,
@@ -213,8 +222,71 @@ IMPORTANT: Complete subtasks sequentially. Commit, push, and mark done after EAC
             thread,
             subtaskIds: subtasks.map(s => s.task['Task ID']),
           });
+          for (const s of subtasks) handledTaskIds.add(s.task['Task ID']);
         }
       }
+    }
+
+    // ─── Resume pass: every open task assigned to me must surface ──
+    // Any non-Done/non-Blocked task that didn't match a rich-prompt branch
+    // gets a generic "resume" entry. The HEARTBEAT.md consumer still gates
+    // on OpenClaw session liveness — if a fresh thread is already streaming
+    // against `pipeline:<taskId>`, the consumer skips the spawn.
+    const assignedOpenTasks = [];
+    for (const task of myTasks) {
+      const taskId = task['Task ID'];
+      const status = task['Status'];
+      if (status === 'Done' || status === 'Blocked') continue;
+
+      const isSubtask = task['Parent'] !== 'None';
+      const updatedAt = task['updated_at'];
+      let ageMinutes = null;
+      if (updatedAt) {
+        const t = new Date(updatedAt + 'Z').getTime();
+        if (!Number.isNaN(t)) ageMinutes = Math.round((Date.now() - t) / 60000);
+      }
+
+      assignedOpenTasks.push({ taskId, status, isSubtask, ageMinutes });
+
+      if (handledTaskIds.has(taskId)) continue;
+
+      const specParsed = libs.validate.parseSpecValue(task['Spec']);
+      const specFileId = specParsed?.fileId || 'unknown';
+      const wt = libs.trackerDb.getParentWorktree(isSubtask ? task['Parent'] : taskId);
+      const wtInstruction = wt
+        ? `\nWORKTREE: ${wt.path} (branch: ${wt.branch}). cd there before inspecting code.`
+        : '';
+      const ageNote = ageMinutes != null ? ` Last updated ~${ageMinutes}m ago.` : '';
+
+      const prompt = `Task ${taskId} "${task['Task Name']}" (status: ${status}) is assigned to you and not Done.${ageNote} No specific action template matched, which usually means the task is mid-flight or in a state the heartbeat doesn't have a canned prompt for.
+
+Spec file ID: ${specFileId}.${wtInstruction}
+
+YOUR JOB:
+1. Read the spec for context.
+2. Check git/worktree state and the task log: \`stask log ${taskId}\`.
+3. Decide:
+   - If this is a parent task whose subtasks are still in flight, no action needed — confirm and exit.
+   - If real work is stuck, pick it up: implement, transition, or re-delegate as appropriate to your role.
+   - If you're blocked, transition the task to Blocked with a reason.
+
+Do not duplicate work — if another live session is already driving this task, exit immediately.`;
+
+      const threadRef = getThreadRef(db, isSubtask ? task['Parent'] : taskId);
+      const thread = threadRef ? { channelId: threadRef.channelId, threadTs: threadRef.threadTs } : null;
+
+      pendingTasks.push({
+        taskId,
+        taskName: task['Task Name'],
+        status,
+        parent: task['Parent'],
+        specFileId,
+        action: 'resume',
+        prompt,
+        thread,
+        ageMinutes,
+      });
+      handledTaskIds.add(taskId);
     }
 
     // ─── Unprocessed inbox items ──────────────────────────────
@@ -226,7 +298,13 @@ IMPORTANT: Complete subtasks sequentially. Commit, push, and mark done after EAC
       // inbox tables may not exist yet
     }
 
-    return { agent: agentName, pendingTasks, inboxItems, config: { staleSessionMinutes: CONFIG.staleSessionMinutes } };
+    return {
+      agent: agentName,
+      pendingTasks,
+      assignedOpen: { count: assignedOpenTasks.length, tasks: assignedOpenTasks },
+      inboxItems,
+      config: { staleSessionMinutes: CONFIG.staleSessionMinutes },
+    };
   });
 
   console.log(JSON.stringify(result, null, 2));

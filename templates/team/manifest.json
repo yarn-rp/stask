@@ -16,7 +16,8 @@
       "announceTimeoutMs": 600000,
       "runTimeoutSeconds": 1800
     },
-    "memorySearch": { "provider": "ollama" }
+    "memorySearch": { "provider": "ollama" },
+    "tools": { "sessions": { "visibility": "all" } }
   },
 
   "stask": {

@@ -47,6 +47,21 @@ export async function run(argv) {
     // Track which task IDs got a rich-prompt entry so the resume pass can skip them.
     const handledTaskIds = new Set();
 
+    // Approval gate: a task is "approved" iff the human ticked the
+    // spec_approved checkbox in Slack — slack-reconcile persists that as
+    // spec_approved_at. For subtasks the parent's approval is what counts.
+    // No agent (lead, worker, QA) may receive an actionable prompt for an
+    // unapproved task. Unapproved tasks are still surfaced via the resume
+    // pass with action: 'awaiting-approval' so the agent knows about them
+    // but is told explicitly NOT to start work.
+    const isApproved = (task) => {
+      if (task['Parent'] !== 'None') {
+        const parent = libs.trackerDb.findTask(task['Parent']);
+        return Boolean(parent?.['spec_approved_at']);
+      }
+      return Boolean(task['spec_approved_at']);
+    };
+
     for (const task of myTasks) {
       const taskId = task['Task ID'];
       const status = task['Status'];
@@ -59,6 +74,11 @@ export async function run(argv) {
       // sessions_list(activeMinutes=10) on label `pipeline:<taskId>`. Heartbeat
       // surfaces every open task; the consumer decides whether to spawn.
 
+      // Hard approval gate: skip every actionable branch if the task hasn't
+      // been approved by the human. The resume pass below will still surface
+      // it as 'awaiting-approval'.
+      const approved = isApproved(task);
+
       const specParsed = libs.validate.parseSpecValue(task['Spec']);
       const specFileId = specParsed?.fileId || 'unknown';
 
@@ -66,7 +86,7 @@ export async function run(argv) {
       let prompt = null;
 
       // ─── Lead actions ──────────────────────────────────────────
-      if (agentRole === 'lead') {
+      if (agentRole === 'lead' && approved) {
         if (status === 'To-Do' && !hasSubtasks) {
           action = 'delegate';
           const workers = Object.entries(CONFIG.agents)
@@ -126,12 +146,12 @@ The PR description is what Yan sees first. Make it count.`;
       }
 
       // ─── Worker actions (collected, grouped by parent after loop) ─
-      if (agentRole === 'worker' && status === 'In-Progress' && isSubtask) {
+      if (agentRole === 'worker' && status === 'In-Progress' && isSubtask && approved) {
         workerSubtaskQueue.push({ task, specFileId });
       }
 
       // ─── QA actions ────────────────────────────────────────────
-      if (agentRole === 'qa' && status === 'Testing' && !isSubtask) {
+      if (agentRole === 'qa' && status === 'Testing' && !isSubtask && approved) {
         action = 'qa';
         const wt = libs.trackerDb.getParentWorktree(taskId);
         const wtInstruction = wt ? `\nIMPORTANT: The code to test is in the task worktree at: ${wt.path} (branch: ${wt.branch}).` : '';
@@ -229,9 +249,11 @@ IMPORTANT: Complete subtasks sequentially. Commit, push, and mark done after EAC
 
     // ─── Resume pass: every open task assigned to me must surface ──
     // Any non-Done/non-Blocked task that didn't match a rich-prompt branch
-    // gets a generic "resume" entry. The HEARTBEAT.md consumer still gates
-    // on OpenClaw session liveness — if a fresh thread is already streaming
-    // against `pipeline:<taskId>`, the consumer skips the spawn.
+    // gets a generic "resume" entry. Unapproved tasks get a HARDER
+    // "awaiting-approval" entry that explicitly tells the agent NOT to
+    // start work. The HEARTBEAT.md consumer still gates on OpenClaw
+    // session liveness — if a fresh thread is already streaming against
+    // `pipeline:<taskId>`, the consumer skips the spawn.
     const assignedOpenTasks = [];
     for (const task of myTasks) {
       const taskId = task['Task ID'];
@@ -239,6 +261,7 @@ IMPORTANT: Complete subtasks sequentially. Commit, push, and mark done after EAC
       if (status === 'Done' || status === 'Blocked') continue;
 
       const isSubtask = task['Parent'] !== 'None';
+      const approved = isApproved(task);
       const updatedAt = task['updated_at'];
       let ageMinutes = null;
       if (updatedAt) {
@@ -246,7 +269,7 @@ IMPORTANT: Complete subtasks sequentially. Commit, push, and mark done after EAC
         if (!Number.isNaN(t)) ageMinutes = Math.round((Date.now() - t) / 60000);
       }
 
-      assignedOpenTasks.push({ taskId, status, isSubtask, ageMinutes });
+      assignedOpenTasks.push({ taskId, status, isSubtask, approved, ageMinutes });
 
       if (handledTaskIds.has(taskId)) continue;
 
@@ -258,7 +281,26 @@ IMPORTANT: Complete subtasks sequentially. Commit, push, and mark done after EAC
         : '';
       const ageNote = ageMinutes != null ? ` Last updated ~${ageMinutes}m ago.` : '';
 
-      const prompt = `Task ${taskId} "${task['Task Name']}" (status: ${status}) is assigned to you and not Done.${ageNote} No specific action template matched, which usually means the task is mid-flight or in a state the heartbeat doesn't have a canned prompt for.
+      let action;
+      let prompt;
+      if (!approved) {
+        action = 'awaiting-approval';
+        const ownership = isSubtask
+          ? `parent task ${task['Parent']}`
+          : `this task`;
+        prompt = `Task ${taskId} "${task['Task Name']}" (status: ${status}) is assigned to you, but ${ownership} has NOT been approved by the human.${ageNote}
+
+DO NOT start work. Do not write code, create subtasks, transition status, or modify the spec.
+
+The only valid actions right now:
+1. Confirm the task exists and exit.
+2. If the spec needs more clarifying questions, post them in the task thread for the human — do not act on assumptions.
+3. Wait for the human to tick the spec_approved checkbox in Slack. The next heartbeat after approval will give you a real action prompt.
+
+Exit immediately.`;
+      } else {
+        action = 'resume';
+        prompt = `Task ${taskId} "${task['Task Name']}" (status: ${status}) is assigned to you and not Done.${ageNote} No specific action template matched, which usually means the task is mid-flight or in a state the heartbeat doesn't have a canned prompt for.
 
 Spec file ID: ${specFileId}.${wtInstruction}
 
@@ -271,6 +313,7 @@ YOUR JOB:
    - If you're blocked, transition the task to Blocked with a reason.
 
 Do not duplicate work — if another live session is already driving this task, exit immediately.`;
+      }
 
       const threadRef = getThreadRef(db, isSubtask ? task['Parent'] : taskId);
       const thread = threadRef ? { channelId: threadRef.channelId, threadTs: threadRef.threadTs } : null;
@@ -281,10 +324,11 @@ Do not duplicate work — if another live session is already driving this task, 
         status,
         parent: task['Parent'],
         specFileId,
-        action: 'resume',
+        action,
         prompt,
         thread,
         ageMinutes,
+        approved,
       });
       handledTaskIds.add(taskId);
     }

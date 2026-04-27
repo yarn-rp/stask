@@ -28,6 +28,8 @@ CREATE TABLE IF NOT EXISTS tasks (
   pr            TEXT,
   qa_fail_count INTEGER NOT NULL DEFAULT 0,
   pr_status     TEXT,
+  spec_approved_at TEXT,
+  spec_approved_by TEXT,
   created_at    TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );

@@ -7,7 +7,7 @@ Fired by cron. Must be fast: query, spawn subsessions, return. **Never do delega
    stask --project {{PROJECT_SLUG}} heartbeat {{LEAD_NAME_LOWER}}
    ```
 
-2. For each entry in `pendingTasks` (including `action: "resume"` entries — treat them the same), check for a live session: `sessions_list(activeMinutes=10)`, look for `pipeline:<task-id>`. If none:
+2. For each entry in `pendingTasks` (actions: `delegate`, `create-pr`, `review-qa-failure`, `request-approval`, `resume` — treat them all the same), check for a live session: `sessions_list(activeMinutes=10)`, look for `pipeline:<task-id>`. If none:
    ```js
    sessions_spawn({
      agentId: "{{LEAD_NAME_LOWER}}",
@@ -17,7 +17,7 @@ Fired by cron. Must be fast: query, spawn subsessions, return. **Never do delega
      task: "<prompt from the pendingTask JSON>"
    })
    ```
-   The JSON also includes `assignedOpen.{count, tasks[]}` — every non-Done task assigned to you. It's informational (your full plate); it doesn't drive spawning. The `pendingTasks` list already covers the actionable subset.
+   The JSON also includes a slim `summary: { totalAssignedOpen, awaitingApproval }` so you can see your full plate at a glance — informational only, doesn't drive spawning. The `request-approval` action means an unapproved task needs the human pinged in Slack; the prompt walks the spawned agent through it and includes a cooldown so you won't re-ping every tick.
 
 3. Infrastructure checks (inline, fast):
    ```bash

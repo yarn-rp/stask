@@ -36,7 +36,7 @@ export async function run(argv) {
       return {
         agent: agentName,
         pendingTasks: [],
-        assignedOpen: { count: 0, tasks: [] },
+        summary: { totalAssignedOpen: 0, awaitingApproval: 0 },
         inboxItems: [],
         config: { staleSessionMinutes: CONFIG.staleSessionMinutes },
       };
@@ -50,10 +50,9 @@ export async function run(argv) {
     // Approval gate: a task is "approved" iff the human ticked the
     // spec_approved checkbox in Slack — slack-reconcile persists that as
     // spec_approved_at. For subtasks the parent's approval is what counts.
-    // No agent (lead, worker, QA) may receive an actionable prompt for an
-    // unapproved task. Unapproved tasks are still surfaced via the resume
-    // pass with action: 'awaiting-approval' so the agent knows about them
-    // but is told explicitly NOT to start work.
+    // Unapproved tasks never produce work-starting prompts. For the lead,
+    // they produce a `request-approval` action (ping the human in Slack);
+    // for workers / QA they're skipped (the lead owns approval shepherding).
     const isApproved = (task) => {
       if (task['Parent'] !== 'None') {
         const parent = libs.trackerDb.findTask(task['Parent']);
@@ -61,6 +60,25 @@ export async function run(argv) {
       }
       return Boolean(task['spec_approved_at']);
     };
+
+    // Idempotency for `request-approval`: don't re-ping more than once
+    // every APPROVAL_PING_COOLDOWN_MIN minutes per task. The action prompt
+    // tells the agent to write a log entry matching APPROVAL_LOG_PATTERN
+    // after posting the Slack message.
+    const APPROVAL_LOG_PATTERN = /\[approval-request\]/;
+    const APPROVAL_PING_COOLDOWN_MIN = 360; // 6h
+    const recentlyPingedForApproval = (taskId) => {
+      const taskLog = libs.trackerDb.getLogForTask(taskId);
+      const last = taskLog.find(e => APPROVAL_LOG_PATTERN.test(e.message));
+      if (!last) return false;
+      const ts = new Date(last.created_at + 'Z').getTime();
+      if (Number.isNaN(ts)) return false;
+      return (Date.now() - ts) / 60000 < APPROVAL_PING_COOLDOWN_MIN;
+    };
+
+    // Counts for the slim summary returned at the end.
+    let totalAssignedOpen = 0;
+    let awaitingApprovalCount = 0;
 
     for (const task of myTasks) {
       const taskId = task['Task ID'];
@@ -74,10 +92,9 @@ export async function run(argv) {
       // sessions_list(activeMinutes=10) on label `pipeline:<taskId>`. Heartbeat
       // surfaces every open task; the consumer decides whether to spawn.
 
-      // Hard approval gate: skip every actionable branch if the task hasn't
-      // been approved by the human. The resume pass below will still surface
-      // it as 'awaiting-approval'.
+      totalAssignedOpen += 1;
       const approved = isApproved(task);
+      if (!approved) awaitingApprovalCount += 1;
 
       const specParsed = libs.validate.parseSpecValue(task['Spec']);
       const specFileId = specParsed?.fileId || 'unknown';
@@ -85,8 +102,29 @@ export async function run(argv) {
       let action = null;
       let prompt = null;
 
-      // ─── Lead actions ──────────────────────────────────────────
-      if (agentRole === 'lead' && approved) {
+      // ─── Lead: ping human for approval on unapproved tasks ────
+      // Catches the bug at heartbeat time, not after we've spawned a
+      // subagent that reads "do not work" and exits. Cooldown prevents
+      // re-pinging every cron tick.
+      if (agentRole === 'lead' && !approved && !isSubtask) {
+        if (!recentlyPingedForApproval(taskId)) {
+          action = 'request-approval';
+          prompt = `Task ${taskId} "${task['Task Name']}" is assigned to you but the human has not approved the spec. No work may start until they tick the spec_approved checkbox in Slack.
+
+Spec file ID: ${specFileId}.
+
+YOUR JOB — do this and exit:
+1. Read the spec briefly. If it's still missing detail or has open questions, surface those concretely.
+2. Post one message to the task thread asking ${CONFIG.human.name} to approve the spec. If you have open questions, list them in the same message so they're answered before approval. Be concise.
+3. Record the ping so we don't re-ping every heartbeat tick:
+   \`stask log ${taskId} "[approval-request] pinged ${CONFIG.human.name} for spec approval"\`
+
+Do NOT create subtasks. Do NOT transition status. Do NOT write code.`;
+        }
+      }
+
+      // ─── Lead actions (approved tasks only) ───────────────────
+      if (agentRole === 'lead' && approved && !action) {
         if (status === 'To-Do' && !hasSubtasks) {
           action = 'delegate';
           const workers = Object.entries(CONFIG.agents)
@@ -247,31 +285,27 @@ IMPORTANT: Complete subtasks sequentially. Commit, push, and mark done after EAC
       }
     }
 
-    // ─── Resume pass: every open task assigned to me must surface ──
-    // Any non-Done/non-Blocked task that didn't match a rich-prompt branch
-    // gets a generic "resume" entry. Unapproved tasks get a HARDER
-    // "awaiting-approval" entry that explicitly tells the agent NOT to
-    // start work. The HEARTBEAT.md consumer still gates on OpenClaw
-    // session liveness — if a fresh thread is already streaming against
-    // `pipeline:<taskId>`, the consumer skips the spawn.
-    const assignedOpenTasks = [];
+    // ─── Resume pass: catch approved-but-stale work the canned branches missed.
+    // Skipped for unapproved tasks — those are either already covered by the
+    // lead's request-approval action above (parent tasks) or the lead's job
+    // to escalate (an orphan subtask of an unapproved parent shouldn't exist).
+    // The HEARTBEAT.md consumer still gates on OpenClaw session liveness —
+    // if a fresh thread is already streaming against `pipeline:<taskId>`,
+    // the consumer skips the spawn.
     for (const task of myTasks) {
       const taskId = task['Task ID'];
       const status = task['Status'];
       if (status === 'Done' || status === 'Blocked') continue;
+      if (handledTaskIds.has(taskId)) continue;
+      if (!isApproved(task)) continue; // unapproved parents already pinged; subtasks shouldn't exist
 
       const isSubtask = task['Parent'] !== 'None';
-      const approved = isApproved(task);
       const updatedAt = task['updated_at'];
       let ageMinutes = null;
       if (updatedAt) {
         const t = new Date(updatedAt + 'Z').getTime();
         if (!Number.isNaN(t)) ageMinutes = Math.round((Date.now() - t) / 60000);
       }
-
-      assignedOpenTasks.push({ taskId, status, isSubtask, approved, ageMinutes });
-
-      if (handledTaskIds.has(taskId)) continue;
 
       const specParsed = libs.validate.parseSpecValue(task['Spec']);
       const specFileId = specParsed?.fileId || 'unknown';
@@ -281,26 +315,7 @@ IMPORTANT: Complete subtasks sequentially. Commit, push, and mark done after EAC
         : '';
       const ageNote = ageMinutes != null ? ` Last updated ~${ageMinutes}m ago.` : '';
 
-      let action;
-      let prompt;
-      if (!approved) {
-        action = 'awaiting-approval';
-        const ownership = isSubtask
-          ? `parent task ${task['Parent']}`
-          : `this task`;
-        prompt = `Task ${taskId} "${task['Task Name']}" (status: ${status}) is assigned to you, but ${ownership} has NOT been approved by the human.${ageNote}
-
-DO NOT start work. Do not write code, create subtasks, transition status, or modify the spec.
-
-The only valid actions right now:
-1. Confirm the task exists and exit.
-2. If the spec needs more clarifying questions, post them in the task thread for the human — do not act on assumptions.
-3. Wait for the human to tick the spec_approved checkbox in Slack. The next heartbeat after approval will give you a real action prompt.
-
-Exit immediately.`;
-      } else {
-        action = 'resume';
-        prompt = `Task ${taskId} "${task['Task Name']}" (status: ${status}) is assigned to you and not Done.${ageNote} No specific action template matched, which usually means the task is mid-flight or in a state the heartbeat doesn't have a canned prompt for.
+      const prompt = `Task ${taskId} "${task['Task Name']}" (status: ${status}) is assigned to you and not Done.${ageNote} No specific action template matched, which usually means the task is mid-flight or in a state the heartbeat doesn't have a canned prompt for.
 
 Spec file ID: ${specFileId}.${wtInstruction}
 
@@ -313,7 +328,6 @@ YOUR JOB:
    - If you're blocked, transition the task to Blocked with a reason.
 
 Do not duplicate work — if another live session is already driving this task, exit immediately.`;
-      }
 
       const threadRef = getThreadRef(db, isSubtask ? task['Parent'] : taskId);
       const thread = threadRef ? { channelId: threadRef.channelId, threadTs: threadRef.threadTs } : null;
@@ -324,11 +338,10 @@ Do not duplicate work — if another live session is already driving this task, 
         status,
         parent: task['Parent'],
         specFileId,
-        action,
+        action: 'resume',
         prompt,
         thread,
         ageMinutes,
-        approved,
       });
       handledTaskIds.add(taskId);
     }
@@ -345,7 +358,9 @@ Do not duplicate work — if another live session is already driving this task, 
     return {
       agent: agentName,
       pendingTasks,
-      assignedOpen: { count: assignedOpenTasks.length, tasks: assignedOpenTasks },
+      // Slim summary so the agent always knows their plate without us
+      // dumping every row into a parallel array.
+      summary: { totalAssignedOpen, awaitingApproval: awaitingApprovalCount },
       inboxItems,
       config: { staleSessionMinutes: CONFIG.staleSessionMinutes },
     };

@@ -7,7 +7,7 @@ Fired by cron. Must be fast: query, spawn subsessions, return. **Never do delega
    stask --project {{PROJECT_SLUG}} heartbeat {{LEAD_NAME_LOWER}}
    ```
 
-2. For each pending task, check for a live session: `sessions_list(activeMinutes=10)`, look for `pipeline:<task-id>`. If none:
+2. For each entry in `pendingTasks` (including `action: "resume"` entries — treat them the same), check for a live session: `sessions_list(activeMinutes=10)`, look for `pipeline:<task-id>`. If none:
    ```js
    sessions_spawn({
      agentId: "{{LEAD_NAME_LOWER}}",
@@ -17,6 +17,7 @@ Fired by cron. Must be fast: query, spawn subsessions, return. **Never do delega
      task: "<prompt from the pendingTask JSON>"
    })
    ```
+   The JSON also includes `assignedOpen.{count, tasks[]}` — every non-Done task assigned to you. It's informational (your full plate); it doesn't drive spawning. The `pendingTasks` list already covers the actionable subset.
 
 3. Infrastructure checks (inline, fast):
    ```bash

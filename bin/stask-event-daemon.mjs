@@ -130,6 +130,14 @@ async function main() {
 
   const libs = await getWorkspaceLibs();
 
+  // Freeze the slack subtree so a stray `slackApi.getListItems` retry
+  // path can't transiently mutate ctx.config.slack.listId out from under
+  // a sibling handler's match() check. Surfaced when investigating
+  // file_change events that received the same payload but matched on
+  // some deliveries and not others.
+  if (CONFIG?.slack) Object.freeze(CONFIG.slack);
+  Object.freeze(CONFIG);
+
   const ctx = {
     db,
     libs,

@@ -197,8 +197,8 @@ Post all questions in the **parent task thread** using `@yan [QUESTION]` format.
 1. `stask create --name "Bootstrap Team — Explore Codebase & Set Up Agents" --overview "Structured bootstrap task to explore codebase and set up all agents"` → returns task ID and thread ID
 2. `stask spec-update T-XXX --spec shared/specs/bootstrap-team.md`
 3. `stask transition T-XXX "To-Do"`
-4. Create subtasks:
-   - `stask subtask create --parent T-XXX --name "Lead: Orchestrate Bootstrap" --assign professor`
+4. Create subtasks (the lead orchestrates the parent itself — no separate
+   "Lead: Orchestrate Bootstrap" subtask):
    - `stask subtask create --parent T-XXX --name "Backend Exploration" --assign berlin`
    - `stask subtask create --parent T-XXX --name "Frontend Exploration" --assign tokyo`
    - `stask subtask create --parent T-XXX --name "QA Audit" --assign helsinki`

@@ -33,6 +33,14 @@ export async function run(argv) {
       const parent = libs.trackerDb.findTask(args.parent);
       if (!parent) throw new Error(`Parent task ${args.parent} not found`);
       if (parent['Status'] !== 'To-Do') throw new Error(`Parent ${args.parent} is "${parent['Status']}". Must be "To-Do" to create subtasks.`);
+      // Hard approval gate. Without spec_approved_at the human has not
+      // authorized work to start; agents must not begin decomposition.
+      if (!parent['spec_approved_at']) {
+        throw new Error(
+          `Parent ${args.parent} has not been approved by the human. ` +
+          `Tick the spec_approved checkbox in Slack first — only the human can authorize work to start.`
+        );
+      }
 
       const subtaskId = libs.trackerDb.getNextSubtaskId(args.parent);
       const parentSpec = parent['Spec'];

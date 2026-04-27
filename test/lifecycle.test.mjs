@@ -313,18 +313,34 @@ describe('Guard: require_subtasks', () => {
   });
 
   it('passes when all subtasks are assigned', () => {
-    const task = makeTask();
+    // require_approved now demands spec_approved_at — the human must have
+    // ticked the spec_approved checkbox in Slack. Just being assigned to
+    // a non-human agent is no longer sufficient.
+    const task = makeTask({ 'spec_approved_at': '2026-04-27 12:00:00', 'spec_approved_by': 'Yan' });
     const subtasks = [
       { 'Task ID': 'T-500.1', 'Status': 'To-Do', 'Assigned To': 'Gilfoyle' },
       { 'Task ID': 'T-500.2', 'Status': 'To-Do', 'Assigned To': 'Dinesh' },
     ];
     const libs = makeMockLibs(subtasks);
-    // Note: require_approved will also run — task is assigned to Richard (not human), so it passes
     const result = runGuards(task, 'In-Progress', libs);
-    // Checks pass, but setup_worktree will fail (no real worktree). Check only check guards.
-    // require_subtasks and require_approved should both pass
+    // Checks pass; setup_worktree will fail (no real worktree). Check only check guards.
     const checkFailures = result.failures.filter(f => f.name === 'require_subtasks' || f.name === 'require_approved');
     assert.equal(checkFailures.length, 0);
+  });
+
+  it('fails when task is not approved (no spec_approved_at)', () => {
+    // Task assigned to lead but human never ticked the checkbox.
+    const task = makeTask(); // no spec_approved_at
+    const subtasks = [
+      { 'Task ID': 'T-500.1', 'Status': 'To-Do', 'Assigned To': 'Gilfoyle' },
+    ];
+    const libs = makeMockLibs(subtasks);
+    const result = runGuards(task, 'In-Progress', libs);
+    assert.equal(result.ok, false);
+    assert.ok(
+      result.failures.some(f => f.name === 'require_approved'),
+      'expected require_approved to fail when spec_approved_at is missing',
+    );
   });
 
   it('parent-only guards skipped for subtasks, but scope:any guards still run', () => {

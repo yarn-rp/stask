@@ -7,9 +7,9 @@ Fired by cron. Must be fast: query, spawn subsessions, return. **Never do implem
    stask --project {{PROJECT_SLUG}} heartbeat {{FRONTEND_NAME_LOWER}}
    ```
    If `pendingTasks` is empty → reply `HEARTBEAT_OK` and stop.
-   The JSON also includes `assignedOpen.{count, tasks[]}` — every non-Done task assigned to you, informational only. `pendingTasks` is the actionable list and now includes `action: "resume"` entries for tasks that don't match a specific template; treat them like any other entry.
+   The JSON also includes a slim `summary: { totalAssignedOpen, awaitingApproval }` — informational only. `pendingTasks` is the actionable list (actions: `build`, `build-batch`, `resume`); treat every entry the same.
 
-2. For each pending task (including `action: "resume"`), check for a live session: `sessions_list(activeMinutes=10)`, look for label `pipeline:<task-id>`.
+2. For each pending task, check for a live session: `sessions_list(activeMinutes=10)`, look for label `pipeline:<task-id>`.
 
 3. For each pending task with no active session (or one older than `staleSessionMinutes`):
    ```js

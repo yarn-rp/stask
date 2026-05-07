@@ -25,6 +25,7 @@ import path from 'node:path';
 import { loadProjectsRegistry, saveProjectsRegistry, GLOBAL_STASK_DIR } from '../lib/resolve-home.mjs';
 import { configGet, configSetBatch, configUnset, cronRemove, agentsDelete, readRawSecret } from '../lib/setup/openclaw-cli.mjs';
 import { archiveChannel, deleteList, deleteCanvas } from '../lib/setup/slack-teardown.mjs';
+import { removeStaskBlock } from '../lib/setup/git-exclude.mjs';
 
 const OPENCLAW_HOME = path.join(process.env.HOME || '', '.openclaw');
 
@@ -229,7 +230,32 @@ export async function run(args) {
     console.log(`  ✓ Removed workspace: ${workspaceDir}`);
   }
 
-  // ── 5. Remove .stask/ from repo ──────────────────────────────
+  // ── 5. Remove .stask/ from repo + clean up .git/info/exclude ─
+
+  // Collect every repo we may have touched (host repo + any extras
+  // listed in the project config) so we can strip our exclude block
+  // from each. Read the config BEFORE deleting it.
+  const allRepoPaths = new Set();
+  if (repoPath) allRepoPaths.add(repoPath);
+  if (staskConfig && Array.isArray(staskConfig.repos)) {
+    for (const r of staskConfig.repos) {
+      const rp = typeof r === 'string' ? r : r?.path;
+      if (rp) {
+        const abs = path.isAbsolute(rp) ? rp : path.resolve(repoPath || '', rp);
+        allRepoPaths.add(abs);
+      }
+    }
+  }
+
+  for (const rp of allRepoPaths) {
+    try {
+      if (removeStaskBlock(rp)) {
+        console.log(`  ✓ Removed .git/info/exclude block from ${rp}`);
+      }
+    } catch (err) {
+      console.warn(`  ! Could not clean .git/info/exclude in ${rp}: ${err.message}`);
+    }
+  }
 
   if (repoPath) {
     const staskDir = path.join(repoPath, '.stask');

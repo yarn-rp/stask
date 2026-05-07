@@ -37,7 +37,7 @@ import { setupCronJobs } from '../lib/setup/cron-setup.mjs';
 import { getSkillCount } from '../lib/setup/skills.mjs';
 import { initProject } from './init.mjs';
 import { loadManifests, getRoles, getLeadRole, generateSlackManifest } from '../lib/setup/manifest.mjs';
-import { configGet, readRawSecret } from '../lib/setup/openclaw-cli.mjs';
+import { configGet, readRawSecret, modelsList } from '../lib/setup/openclaw-cli.mjs';
 // NOTE: ./event-daemon.mjs imports lib/env.mjs at the top level, which calls
 // resolveProjectRoot() and fails with "No stask project found" when run from a
 // directory without .stask/. Setup is supposed to bypass that resolution
@@ -323,26 +323,79 @@ export async function run(args) {
   // ═══ PHASE 2 — Model Assignment ═══
   if (!isStepDone(state, 'models')) {
     phase(2);
-    log.info(pc.dim('Each agent runs on an Ollama model optimized for their role.\n'));
 
-    const modelLines = ROLES.map(role => {
-      const m = AGENT_MANIFESTS[role.id].model;
-      return `${pc.bold(role.title.padEnd(12))} ${fmtModel(m.primary)}  ${pc.dim('fallbacks:')} ${(m.fallbacks || []).map(fmtModel).join(pc.dim(', '))}`;
-    });
-    note(modelLines.join('\n'), 'Recommended models');
+    // Pull the locally-registered model list from OpenClaw. If the list
+    // is empty (fresh install, gateway down), we fall back to the
+    // manifest's recommended default + free-text override exactly like
+    // before.
+    const localModels = modelsList();
+    const haveLocal = localModels.length > 0;
 
-    const useDefaults = guard(await autoConfirm({ message: 'Use these models?', initialValue: true }));
-    for (const role of ROLES) {
-      const m = AGENT_MANIFESTS[role.id].model;
-      if (useDefaults) {
-        state.data.agents[role.id].model = m.primary;
-      } else {
-        state.data.agents[role.id].model = guard(await text({ message: `${role.title} model`, initialValue: m.primary }));
+    if (haveLocal) {
+      log.info(pc.dim(`Pick a model for each agent. ${localModels.length} model${localModels.length > 1 ? 's' : ''} registered locally via OpenClaw.\n`));
+    } else {
+      log.info(pc.dim('Each agent runs on a model optimized for their role.\n'));
+      const modelLines = ROLES.map(role => {
+        const m = AGENT_MANIFESTS[role.id].model;
+        return `${pc.bold(role.title.padEnd(12))} ${fmtModel(m.primary)}  ${pc.dim('fallbacks:')} ${(m.fallbacks || []).map(fmtModel).join(pc.dim(', '))}`;
+      });
+      note(modelLines.join('\n'), 'Recommended models');
+      log.info(pc.dim('No models registered locally yet. Run `openclaw models add` to expose installed models, then re-run setup.\n'));
+    }
+
+    if (haveLocal) {
+      // Per-role select prompt: recommended default first, then every
+      // other registered model, then a free-text override.
+      for (const role of ROLES) {
+        const m = AGENT_MANIFESTS[role.id].model;
+        const recommended = m.primary;
+        const seen = new Set();
+        const opts = [];
+        if (localModels.includes(recommended)) {
+          opts.push({ value: recommended, label: `${fmtModel(recommended)} ${pc.dim('(recommended)')}` });
+          seen.add(recommended);
+        } else {
+          // Recommended not registered locally — still offer it but flag
+          // that the user will have to register it before agents can run.
+          opts.push({ value: recommended, label: `${fmtModel(recommended)} ${pc.dim('(recommended — not yet registered)')}` });
+          seen.add(recommended);
+        }
+        for (const id of localModels) {
+          if (seen.has(id)) continue;
+          opts.push({ value: id, label: fmtModel(id) });
+          seen.add(id);
+        }
+        opts.push({ value: '__custom__', label: pc.dim('Other (type a model id)…') });
+
+        const picked = guard(await autoSelect({
+          message: `${role.title} model`,
+          initialValue: recommended,
+          options: opts,
+        }));
+        const chosen = picked === '__custom__'
+          ? guard(await text({ message: `${role.title} model id`, initialValue: recommended }))
+          : picked;
+
+        state.data.agents[role.id].model = chosen;
+        state.data.agents[role.id].fallbacks = (m.fallbacks || []).filter((f) => f !== chosen);
+        state.data[`${role.id}Model`] = state.data.agents[role.id].model;
+        state.data[`${role.id}Fallbacks`] = state.data.agents[role.id].fallbacks;
       }
-      state.data.agents[role.id].fallbacks = m.fallbacks || [];
-      // Backward compat
-      state.data[`${role.id}Model`] = state.data.agents[role.id].model;
-      state.data[`${role.id}Fallbacks`] = state.data.agents[role.id].fallbacks;
+    } else {
+      // No local models registered — keep the original "use defaults
+      // y/N + free-text override" flow.
+      const useDefaults = guard(await autoConfirm({ message: 'Use recommended defaults?', initialValue: true }));
+      for (const role of ROLES) {
+        const m = AGENT_MANIFESTS[role.id].model;
+        if (useDefaults) {
+          state.data.agents[role.id].model = m.primary;
+        } else {
+          state.data.agents[role.id].model = guard(await text({ message: `${role.title} model`, initialValue: m.primary }));
+        }
+        state.data.agents[role.id].fallbacks = m.fallbacks || [];
+        state.data[`${role.id}Model`] = state.data.agents[role.id].model;
+        state.data[`${role.id}Fallbacks`] = state.data.agents[role.id].fallbacks;
+      }
     }
     completeStep(state, 'models');
   }

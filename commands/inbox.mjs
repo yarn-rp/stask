@@ -175,21 +175,38 @@ async function cmdShow(args) {
 // ─── Subcommand: subscribe ─────────────────────────────────────────
 
 async function cmdSubscribe(args) {
-  if (!args.source || !args.target) {
+  // For Jira we accept zero-arg subscribe and pull the project key from
+  // the resolved stask config — the team always uses one Jira project
+  // key per stask project.
+  let sourceType = (args.source || '').toLowerCase();
+  let target = args.target;
+
+  if (sourceType === 'jira' && !target) {
+    try {
+      const { CONFIG } = await import('../lib/env.mjs');
+      target = CONFIG.jira?.projectKey;
+    } catch {}
+    if (!target) {
+      console.error('ERROR: Jira project key not found. Set jira.projectKey in .stask/config.json or pass it explicitly.');
+      process.exit(1);
+    }
+  }
+
+  if (!sourceType || !target) {
     console.error('Usage: stask inbox subscribe <source> <target> [--interval seconds] [--filter JSON]');
-    console.error('  source: github | linear');
-    console.error('  target: owner/repo (GitHub) or project-key (Linear)');
+    console.error('  source: github | linear | jira');
+    console.error('  target: owner/repo (GitHub), project-key (Linear), or Jira project key (e.g. ACME)');
+    console.error('         Omit <target> for jira to use config.jira.projectKey.');
     process.exit(1);
   }
 
-  const sourceType = args.source.toLowerCase();
-  if (!['github', 'linear'].includes(sourceType)) {
-    console.error('ERROR: source must be "github" or "linear"');
+  if (!['github', 'linear', 'jira'].includes(sourceType)) {
+    console.error('ERROR: source must be "github", "linear", or "jira"');
     process.exit(1);
   }
 
   // Validate target format
-  if (sourceType === 'github' && !args.target.includes('/')) {
+  if (sourceType === 'github' && !target.includes('/')) {
     console.error('ERROR: GitHub target must be "owner/repo"');
     process.exit(1);
   }
@@ -197,11 +214,11 @@ async function cmdSubscribe(args) {
   // Validate connectivity before subscribing
   if (sourceType === 'github') {
     try {
-      execFileSync('gh', ['api', 'repos/' + args.target, '--jq', '.full_name'], {
+      execFileSync('gh', ['api', 'repos/' + target, '--jq', '.full_name'], {
         encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'],
       });
     } catch {
-      console.error(`ERROR: Cannot access ${args.target} — check gh auth and repo name`);
+      console.error(`ERROR: Cannot access ${target} — check gh auth and repo name`);
       process.exit(1);
     }
   } else if (sourceType === 'linear') {
@@ -213,14 +230,23 @@ async function cmdSubscribe(args) {
       console.error('ERROR: Cannot access Linear — check linear auth');
       process.exit(1);
     }
+  } else if (sourceType === 'jira') {
+    try {
+      execFileSync('jira', ['me'], { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
+    } catch {
+      console.error('ERROR: `jira` CLI not available or not authenticated — run `jira init`');
+      process.exit(1);
+    }
   }
+  args.target = target;
+  args.source = sourceType;
 
   await withDb(async (db, libs) => {
     // Create inbox_subs table if not exists
     db.exec(`
       CREATE TABLE IF NOT EXISTS inbox_subs (
         sub_id        TEXT PRIMARY KEY,
-        source_type   TEXT NOT NULL CHECK (source_type IN ('github', 'linear')),
+        source_type   TEXT NOT NULL CHECK (source_type IN ('github', 'linear', 'jira')),
         target_id     TEXT NOT NULL,
         filters       TEXT,
         poll_interval INTEGER NOT NULL DEFAULT 300,
@@ -269,7 +295,12 @@ async function cmdSubscribe(args) {
     }
 
     const subId = `SUB-${Date.now().toString(36).toUpperCase()}`;
-    const pollInterval = sourceType === 'linear' ? 900 : 300; // Linear=15min, GitHub=5min
+    // Linear=15min, GitHub=5min, Jira=10min
+    const pollInterval = sourceType === 'linear'
+      ? 900
+      : sourceType === 'jira'
+        ? 600
+        : 300;
 
     const resolvedInterval = args.interval ?? pollInterval;
     db.prepare(`

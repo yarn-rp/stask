@@ -24,6 +24,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { configGet, cronList, OpenclawCliError } from '../lib/setup/openclaw-cli.mjs';
+import { readStaskBlock } from '../lib/setup/git-exclude.mjs';
+import { isReady as jiraReady, projectExists as jiraProjectExists } from '../lib/jira-cli.mjs';
 
 const OPENCLAW_HOME = path.join(process.env.HOME || '', '.openclaw');
 
@@ -136,6 +138,61 @@ export async function run(args) {
         ok('No clobbered config snapshots');
       }
     } catch { /* dir missing = nothing to check */ }
+  }
+
+  // ── 7. stask project config — repos list + .git/info/exclude ──
+  // Loaded lazily so `stask doctor` still works in a directory with no
+  // resolved project (e.g. checking the OpenClaw side from anywhere).
+  let projectConfig = null;
+  try {
+    const { CONFIG } = await import('../lib/env.mjs');
+    projectConfig = CONFIG;
+  } catch {}
+
+  if (projectConfig) {
+    if (!Array.isArray(projectConfig.repos) || projectConfig.repos.length === 0) {
+      err(
+        'config.json has no `repos` list',
+        'edit .stask/config.json and add `"repos": [{ "path": "." }]`',
+      );
+    } else {
+      ok(`config has ${projectConfig.repos.length} repo${projectConfig.repos.length > 1 ? 's' : ''} configured`);
+      for (const r of projectConfig.repos) {
+        if (!fs.existsSync(r.path)) {
+          err(`repo path missing: ${r.path}`, `clone the repo at ${r.path} or fix .stask/config.json`);
+          continue;
+        }
+        const block = readStaskBlock(r.path);
+        if (block === null) {
+          warn(`could not check .git/info/exclude for ${r.path}`);
+        } else if (!block.includes('.stask/')) {
+          warn(
+            `.git/info/exclude in ${r.path} missing stask block — stask artifacts may show in git status`,
+            `re-run \`stask setup --only claude\` to repair the exclude block`,
+          );
+        } else {
+          ok(`.git/info/exclude OK in ${r.key || path.basename(r.path)}`);
+        }
+      }
+    }
+
+    // ── 8. Jira CLI + project handshake ──────────────────────────
+    const jiraKey = projectConfig.jira?.projectKey;
+    if (jiraKey) {
+      if (!jiraReady()) {
+        err(
+          '`jira` CLI is not available or not authenticated',
+          'install ankitpokhrel/jira-cli and run `jira init`',
+        );
+      } else if (!jiraProjectExists(jiraKey)) {
+        err(
+          `authenticated user cannot see Jira project "${jiraKey}"`,
+          'verify the project key in .stask/config.json or your Jira permissions',
+        );
+      } else {
+        ok(`jira project "${jiraKey}" reachable`);
+      }
+    }
   }
 
   // ── Output ───────────────────────────────────────────────────

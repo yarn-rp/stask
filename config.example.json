@@ -1,11 +1,18 @@
 {
   "project": "your-project-name",
   "specsDir": "./specs",
-  "projectRepoPath": ".",
+  "repos": [
+    { "path": "." }
+  ],
+  "baseBranch": "main",
   "worktreeBaseDir": "~/.stask/worktrees/your-project-name",
   "staleSessionMinutes": 30,
   "syncIntervalSeconds": 3600,
   "maxQaRetries": 3,
+
+  "jira": {
+    "projectKey": "ACME"
+  },
 
   "eventDaemon": {
     "logPath": ".stask/logs/event-daemon.log",

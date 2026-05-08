@@ -283,22 +283,60 @@ export async function run(args) {
     } else {
       // Interactive: prompt for host repo, then loop for additional repos
       const hostDefault = detectedRepoPath || argPath || '';
-      const firstPath = guard(await text({
-        message: 'Host repo path',
-        initialValue: hostDefault,
-        validate: (v) => {
-          if (!v) return 'Required';
-          const r = path.resolve(v);
-          if (!fs.existsSync(r)) return 'Path does not exist';
-          // Soft-check: warn but don't block if not a git repo
-        },
-      })).trim();
-      const resolvedFirst = path.resolve(firstPath);
-      collectedPaths.add(resolvedFirst);
-      repos.push(resolvedFirst);
 
-      // Loop: offer to add more repos
-      let addMore = true;
+      // Parent-folder auto-detect: if hostDefault is a directory that
+      // ISN'T a git repo but contains 2+ child git repos, offer to track
+      // all of them. Matches the "stask setup ." from a parent folder
+      // workflow where the project spans multiple sibling repos.
+      const isGitRepo = (p) => {
+        try { return fs.existsSync(path.join(p, '.git')); } catch { return false; }
+      };
+      const detectChildRepos = (parent) => {
+        if (!parent || !fs.existsSync(parent) || !fs.statSync(parent).isDirectory()) return [];
+        if (isGitRepo(parent)) return [];
+        try {
+          return fs.readdirSync(parent, { withFileTypes: true })
+            .filter((d) => d.isDirectory() && !d.name.startsWith('.'))
+            .map((d) => path.join(parent, d.name))
+            .filter(isGitRepo)
+            .sort();
+        } catch { return []; }
+      };
+
+      const detected = detectChildRepos(path.resolve(hostDefault || '.'));
+      let usedAutoDetect = false;
+      if (detected.length >= 2) {
+        log.info(pc.dim(`Detected ${detected.length} git repos under ${path.resolve(hostDefault || '.')}:`));
+        for (let i = 0; i < detected.length; i++) {
+          const suffix = i === 0 ? pc.dim('  ← will host .stask/') : '';
+          log.info(`  ${pc.bold(String(i + 1) + '.')} ${detected[i]}${suffix}`);
+        }
+        log.info('');
+        const useAll = guard(await confirm({ message: `Track all ${detected.length} repositories?`, initialValue: true }));
+        if (useAll) {
+          for (const r of detected) { collectedPaths.add(r); repos.push(r); }
+          usedAutoDetect = true;
+        }
+      }
+
+      if (!usedAutoDetect) {
+        const firstPath = guard(await text({
+          message: 'Host repo path',
+          initialValue: hostDefault,
+          validate: (v) => {
+            if (!v) return 'Required';
+            const r = path.resolve(v);
+            if (!fs.existsSync(r)) return 'Path does not exist';
+            // Soft-check: warn but don't block if not a git repo
+          },
+        })).trim();
+        const resolvedFirst = path.resolve(firstPath);
+        collectedPaths.add(resolvedFirst);
+        repos.push(resolvedFirst);
+      }
+
+      // Loop: offer to add more repos (skipped when auto-detect was accepted)
+      let addMore = !usedAutoDetect;
       while (addMore) {
         const ans = guard(await confirm({ message: 'Add another repository?', initialValue: false }));
         if (!ans) { addMore = false; break; }

@@ -38,7 +38,7 @@ function listProjects(args) {
     } else {
       console.log('No projects registered.');
       console.log('');
-      console.log('Create one with: stask init <name> --repo <path>');
+      console.log('Create one with: stask setup <path>');
     }
     return;
   }

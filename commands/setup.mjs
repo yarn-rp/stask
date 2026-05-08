@@ -35,7 +35,7 @@ import { writeSlackIdsToConfig } from '../lib/setup/slack-list.mjs';
 import { registerAgents } from '../lib/setup/openclaw-config.mjs';
 import { setupCronJobs } from '../lib/setup/cron-setup.mjs';
 import { getSkillCount } from '../lib/setup/skills.mjs';
-import { initProject } from './init.mjs';
+import { initProject } from '../lib/init-project.mjs';
 import { loadManifests, getRoles, getLeadRole, generateSlackManifest } from '../lib/setup/manifest.mjs';
 import { configGet, readRawSecret, modelsList } from '../lib/setup/openclaw-cli.mjs';
 // NOTE: ./event-daemon.mjs imports lib/env.mjs at the top level, which calls
@@ -105,6 +105,8 @@ export async function run(args) {
   let onlySteps = null;
   let headless = false;
   let cliSlackUserId = null;
+  let cliJiraKey = null;
+  const cliRepoPaths = []; // --repo <path> (repeatable)
   const agentFlags = []; // { roleId, name, botToken, appToken }
   const validRoleIds = ROLES.map((r) => r.id);
 
@@ -118,6 +120,10 @@ export async function run(args) {
       i++;
     } else if (args[i] === '--slack-user-id' && args[i + 1]) {
       cliSlackUserId = args[++i];
+    } else if (args[i] === '--repo' && args[i + 1]) {
+      cliRepoPaths.push(args[++i]);
+    } else if (args[i] === '--jira-key' && args[i + 1]) {
+      cliJiraKey = args[++i];
     } else if (args[i] === '--yes' || args[i] === '-y') {
       headless = true;
     } else if (!args[i].startsWith('--')) {
@@ -131,7 +137,8 @@ export async function run(args) {
   // with a clear message rather than mid-wizard.
   if (headless) {
     const missing = [];
-    if (!argPath) missing.push('positional path (e.g. `stask setup .`)');
+    // At least one repo source is required: positional path OR one or more --repo flags
+    if (!argPath && cliRepoPaths.length === 0) missing.push('positional path or at least one --repo <path>');
     if (!cliSlackUserId) missing.push('--slack-user-id <U…>');
     if (agentFlags.length < ROLES.length) {
       const provided = new Set(agentFlags.map((a) => a.roleId));
@@ -238,8 +245,6 @@ export async function run(args) {
 
   const projectName = guard(await autoText({ message: 'Project name', placeholder: 'my-saas', initialValue: detectedProjectName || '', validate: (v) => !v ? 'Required' : undefined }));
   const projectSlug = projectName.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
-  const absRepoPath = guard(await autoText({ message: 'Repo path', initialValue: detectedRepoPath || '', validate: (v) => { if (!v) return 'Required'; if (!fs.existsSync(path.resolve(v))) return 'Path does not exist'; } })).trim();
-  const resolvedRepoPath = path.resolve(absRepoPath);
 
   const existingState = loadSetupState(projectSlug);
   let state;
@@ -250,9 +255,115 @@ export async function run(args) {
     state = createState(projectSlug);
   }
 
+  // ── Repositories step ──────────────────────────────────────────
+  // Collect 1..N repos. The first hosts .stask/; rest go in extraRepoPaths.
+  // In headless mode: --repo flags drive the list; positional path is used
+  // as the first repo when no --repo flags are provided (back-compat).
+  if (!state.data.repoPath) {
+    // Determine headless repo list (--repo flags take precedence over positional)
+    const headlessRepos = cliRepoPaths.length > 0
+      ? cliRepoPaths.map((p) => path.resolve(p))
+      : argPath ? [path.resolve(argPath)] : [];
+
+    log.info(pc.dim('stask projects can span multiple repositories. The first repo'));
+    log.info(pc.dim('hosts .stask/ (the source of truth); add more if your project'));
+    log.info(pc.dim('has separate frontend/backend/infra repos.\n'));
+
+    const repos = [];
+    const collectedPaths = new Set();
+
+    if (headless) {
+      // Headless: consume preloaded repo list
+      for (const rp of headlessRepos) {
+        if (!fs.existsSync(rp)) { bail(`Repo path does not exist: ${rp}`); }
+        if (collectedPaths.has(rp)) { bail(`Duplicate repo path: ${rp}`); }
+        collectedPaths.add(rp);
+        repos.push(rp);
+      }
+    } else {
+      // Interactive: prompt for host repo, then loop for additional repos
+      const hostDefault = detectedRepoPath || argPath || '';
+      const firstPath = guard(await text({
+        message: 'Host repo path',
+        initialValue: hostDefault,
+        validate: (v) => {
+          if (!v) return 'Required';
+          const r = path.resolve(v);
+          if (!fs.existsSync(r)) return 'Path does not exist';
+          // Soft-check: warn but don't block if not a git repo
+        },
+      })).trim();
+      const resolvedFirst = path.resolve(firstPath);
+      collectedPaths.add(resolvedFirst);
+      repos.push(resolvedFirst);
+
+      // Loop: offer to add more repos
+      let addMore = true;
+      while (addMore) {
+        const ans = guard(await confirm({ message: 'Add another repository?', initialValue: false }));
+        if (!ans) { addMore = false; break; }
+        const extraPath = guard(await text({
+          message: 'Repository path',
+          validate: (v) => {
+            if (!v) return 'Required';
+            const r = path.resolve(v);
+            if (!fs.existsSync(r)) return 'Path does not exist';
+            if (collectedPaths.has(r)) return 'Duplicate repo path';
+          },
+        })).trim();
+        const resolvedExtra = path.resolve(extraPath);
+        collectedPaths.add(resolvedExtra);
+        repos.push(resolvedExtra);
+      }
+    }
+
+    if (repos.length === 0) bail('At least one repository is required.');
+
+    // Confirm summary
+    const repoLabel = repos.length === 1 ? 'repository' : 'repositories';
+    log.info(pc.dim(`You're tracking ${repos.length} ${repoLabel}:`));
+    for (let i = 0; i < repos.length; i++) {
+      const suffix = i === 0 ? pc.dim('  ← hosts .stask/') : '';
+      log.info(`  ${i + 1}. ${repos[i]}${suffix}`);
+    }
+    log.info('');
+
+    state.data.repoPath = repos[0];
+    state.data.extraRepoPaths = repos.slice(1);
+  }
+
+  const resolvedRepoPath = state.data.repoPath;
+  // Back-compat: keep detectedRepoPath consistent for any downstream checks
+  if (!detectedRepoPath) detectedRepoPath = resolvedRepoPath;
+
+  // ── Jira project key (optional) ────────────────────────────────
+  if (state.data.jiraKey === undefined) {
+    let jiraKey = null;
+    const headlessJiraKey = cliJiraKey || null;
+
+    if (headless) {
+      jiraKey = headlessJiraKey || null;
+    } else {
+      const trackJira = guard(await confirm({ message: 'Track a Jira project?', initialValue: false }));
+      if (trackJira) {
+        jiraKey = guard(await text({
+          message: 'Jira project key',
+          placeholder: 'ACME',
+          validate: (v) => {
+            if (!v) return 'Required';
+            if (!/^[A-Z][A-Z0-9_]+$/.test(v)) return 'Must be uppercase letters, digits, and underscores (e.g. ACME)';
+          },
+        }));
+      }
+    }
+
+    // Store null as explicit sentinel (undefined means "not yet asked")
+    state.data.jiraKey = jiraKey;
+  }
+
   const humanName = guard(await autoText({ message: 'Your name', initialValue: ghName }));
   const humanGithub = guard(await autoText({ message: 'GitHub username', initialValue: ghUser }));
-  Object.assign(state.data, { projectName, projectSlug, repoPath: resolvedRepoPath, humanName, humanGithub });
+  Object.assign(state.data, { projectName, projectSlug, humanName, humanGithub });
   completeStep(state, 'basics');
 
   // ── Apply --agent flags ──────────────────────────────────────
@@ -650,7 +761,10 @@ export async function run(args) {
     const staskDir = path.join(d.repoPath, '.stask');
     if (!fs.existsSync(path.join(staskDir, 'config.json'))) {
       initProject({
-        name: d.projectSlug, repoPath: d.repoPath,
+        name: d.projectSlug,
+        repoPath: d.repoPath,
+        extraRepoPaths: d.extraRepoPaths || [],
+        jira: d.jiraKey ? { projectKey: d.jiraKey } : undefined,
         configOverrides: {
           human: { name: d.humanName, githubUsername: d.humanGithub, slackUserId: d.humanSlackUserId || 'UXXXXXXXXXX' },
           agents: staskAgents,

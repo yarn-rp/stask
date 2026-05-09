@@ -72,9 +72,10 @@ export async function run(args) {
     } catch {}
   }
 
-  // Find repo path from projects.json
+  // Find project home from projects.json (supports both new 'projectHome' and legacy 'repoPath' fields)
   const registry = loadProjectsRegistry();
-  const repoPath = registry.projects?.[slug]?.repoPath;
+  const projectEntry = registry.projects?.[slug];
+  const repoPath = projectEntry?.projectHome || projectEntry?.repoPath;
 
   // ── Confirm ──────────────────────────────────────────────────
 

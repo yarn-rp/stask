@@ -4,6 +4,16 @@
  * Usage: stask setup [path]
  *        stask setup [path] --only channel,list,canvas,bookmark,welcome,skills,cron,openclaw,verify,inbox
  *        stask setup [path] --agent <role>:<name>:<bot-token>:<app-token> [--agent ...]
+ *        stask setup --home <path> --repo <path> [--repo <path> ...]
+ *
+ * --home <path>   Project home directory (where .stask/ will be written).
+ *                 Defaults to the positional path argument or cwd.
+ *                 The project home is NOT required to be a git repo.
+ *
+ * --repo <path>   A repository to track (repeatable). These are the git repos
+ *                 used as push targets. All repos are peers — no "host" repo.
+ *                 In headless mode, --home (or positional) AND at least one
+ *                 --repo (or auto-detected child repos) are required.
  *
  * --agent pre-loads a role's agent name + Slack tokens for this run so the
  * wizard skips the team-naming prompt and the Slack-app token prompt for
@@ -106,6 +116,7 @@ export async function run(args) {
   let headless = false;
   let cliSlackUserId = null;
   let cliJiraKey = null;
+  let cliHomePath = null; // --home <path> override for project home
   const cliRepoPaths = []; // --repo <path> (repeatable)
   const agentFlags = []; // { roleId, name, botToken, appToken }
   const validRoleIds = ROLES.map((r) => r.id);
@@ -120,6 +131,8 @@ export async function run(args) {
       i++;
     } else if (args[i] === '--slack-user-id' && args[i + 1]) {
       cliSlackUserId = args[++i];
+    } else if (args[i] === '--home' && args[i + 1]) {
+      cliHomePath = args[++i];
     } else if (args[i] === '--repo' && args[i + 1]) {
       cliRepoPaths.push(args[++i]);
     } else if (args[i] === '--jira-key' && args[i + 1]) {
@@ -137,8 +150,11 @@ export async function run(args) {
   // with a clear message rather than mid-wizard.
   if (headless) {
     const missing = [];
-    // At least one repo source is required: positional path OR one or more --repo flags
-    if (!argPath && cliRepoPaths.length === 0) missing.push('positional path or at least one --repo <path>');
+    // Project home: --home flag takes precedence, then positional path
+    const headlessHome = cliHomePath || argPath;
+    if (!headlessHome) missing.push('--home <path> or a positional path (project home directory)');
+    // At least one repo source is required in headless mode:
+    // --repo flags or auto-detected child repos (checked later once home is resolved)
     if (!cliSlackUserId) missing.push('--slack-user-id <U…>');
     if (agentFlags.length < ROLES.length) {
       const provided = new Set(agentFlags.map((a) => a.roleId));
@@ -196,20 +212,25 @@ export async function run(args) {
     seenRoles.add(a.roleId);
   }
 
-  let detectedRepoPath = null;
+  // Determine project home: --home flag > positional arg > null
+  let detectedProjectHome = null;
   let detectedProjectName = null;
 
-  if (argPath) {
-    const resolved = path.resolve(argPath);
+  const rawHomePath = cliHomePath || argPath;
+  if (rawHomePath) {
+    const resolved = path.resolve(rawHomePath);
     if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
-      detectedRepoPath = resolved;
+      detectedProjectHome = resolved;
       detectedProjectName = path.basename(resolved);
     }
   }
 
+  // Legacy compat alias: detectedRepoPath was used downstream in partial mode
+  const detectedRepoPath = detectedProjectHome;
+
   // ── Partial mode ─────────────────────────────────────────────
   if (onlySteps) {
-    return runPartial({ onlySteps, detectedRepoPath });
+    return runPartial({ onlySteps, detectedRepoPath: detectedProjectHome });
   }
 
   // ── Full setup wizard ────────────────────────────────────────
@@ -255,25 +276,78 @@ export async function run(args) {
     state = createState(projectSlug);
   }
 
-  // ── Repositories step ──────────────────────────────────────────
-  // Collect 1..N repos. The first hosts .stask/; rest go in extraRepoPaths.
-  // In headless mode: --repo flags drive the list; positional path is used
-  // as the first repo when no --repo flags are provided (back-compat).
-  if (!state.data.repoPath) {
-    // Determine headless repo list (--repo flags take precedence over positional)
-    const headlessRepos = cliRepoPaths.length > 0
-      ? cliRepoPaths.map((p) => path.resolve(p))
-      : argPath ? [path.resolve(argPath)] : [];
+  // ── Step A: Project home ──────────────────────────────────────
+  // The project home is where .stask/ will be written. It is NOT required
+  // to be a git repo. The repos inside it are peers used as push targets.
+  if (!state.data.projectHome) {
+    // Migrate legacy state: if old state had repoPath but no projectHome,
+    // bail with a clear message rather than silently using stale state.
+    if (state.data.repoPath !== undefined) {
+      cancel('Stale setup state detected (old "repoPath" shape). Delete ~/.stask/' + projectSlug + '/state.json and re-run stask setup.');
+      process.exit(0);
+    }
 
-    log.info(pc.dim('stask projects can span multiple repositories. The first repo'));
-    log.info(pc.dim('hosts .stask/ (the source of truth); add more if your project'));
-    log.info(pc.dim('has separate frontend/backend/infra repos.\n'));
+    let projectHome;
+    if (headless) {
+      // Headless: --home flag takes precedence, then positional arg
+      const rawHome = cliHomePath || argPath;
+      if (!rawHome) bail('--yes requires --home <path> or a positional path (project home directory)');
+      projectHome = path.resolve(rawHome);
+      if (!fs.existsSync(projectHome)) bail(`Project home path does not exist: ${projectHome}`);
+      if (!fs.statSync(projectHome).isDirectory()) bail(`Project home path is not a directory: ${projectHome}`);
+    } else {
+      const homeDefault = detectedProjectHome || process.cwd();
+      projectHome = path.resolve(guard(await autoText({
+        message: 'Project home directory (.stask/ will be created here)',
+        initialValue: homeDefault,
+        validate: (v) => {
+          if (!v) return 'Required';
+          const r = path.resolve(v);
+          if (!fs.existsSync(r)) return 'Path does not exist';
+          if (!fs.statSync(r).isDirectory()) return 'Must be a directory';
+          // NOT required to be a git repo — parent folder is the project home
+        },
+      })).trim());
+    }
+
+    state.data.projectHome = projectHome;
+  }
+
+  const resolvedProjectHome = state.data.projectHome;
+
+  // ── Step B: Repositories ──────────────────────────────────────
+  // Collect 1..N repo paths (all peers; no "host" semantics).
+  // In headless mode: --repo flags OR auto-detected child repos.
+  if (!state.data.repos) {
+    // Helper: check if a directory is a git repo
+    const isGitRepo = (p) => {
+      try { return fs.existsSync(path.join(p, '.git')); } catch { return false; }
+    };
+    // Helper: detect child git repos under a parent directory
+    const detectChildRepos = (parent) => {
+      if (!parent || !fs.existsSync(parent) || !fs.statSync(parent).isDirectory()) return [];
+      try {
+        return fs.readdirSync(parent, { withFileTypes: true })
+          .filter((d) => d.isDirectory() && !d.name.startsWith('.'))
+          .map((d) => path.join(parent, d.name))
+          .filter(isGitRepo)
+          .sort();
+      } catch { return []; }
+    };
 
     const repos = [];
     const collectedPaths = new Set();
 
     if (headless) {
-      // Headless: consume preloaded repo list
+      // Headless: --repo flags drive the list; auto-detect if none provided
+      const headlessRepos = cliRepoPaths.length > 0
+        ? cliRepoPaths.map((p) => path.resolve(p))
+        : detectChildRepos(resolvedProjectHome);
+
+      if (headlessRepos.length === 0) {
+        bail('--yes requires at least one --repo <path> or auto-detectable child git repos under the project home');
+      }
+
       for (const rp of headlessRepos) {
         if (!fs.existsSync(rp)) { bail(`Repo path does not exist: ${rp}`); }
         if (collectedPaths.has(rp)) { bail(`Duplicate repo path: ${rp}`); }
@@ -281,38 +355,20 @@ export async function run(args) {
         repos.push(rp);
       }
     } else {
-      // Interactive: prompt for host repo, then loop for additional repos
-      const hostDefault = detectedRepoPath || argPath || '';
+      log.info(pc.dim('stask projects can span multiple repositories. All repos are peers'));
+      log.info(pc.dim('used as branch/PR targets. .stask/ lives in the project home above.\n'));
 
-      // Parent-folder auto-detect: if hostDefault is a directory that
-      // ISN'T a git repo but contains 2+ child git repos, offer to track
-      // all of them. Matches the "stask setup ." from a parent folder
-      // workflow where the project spans multiple sibling repos.
-      const isGitRepo = (p) => {
-        try { return fs.existsSync(path.join(p, '.git')); } catch { return false; }
-      };
-      const detectChildRepos = (parent) => {
-        if (!parent || !fs.existsSync(parent) || !fs.statSync(parent).isDirectory()) return [];
-        if (isGitRepo(parent)) return [];
-        try {
-          return fs.readdirSync(parent, { withFileTypes: true })
-            .filter((d) => d.isDirectory() && !d.name.startsWith('.'))
-            .map((d) => path.join(parent, d.name))
-            .filter(isGitRepo)
-            .sort();
-        } catch { return []; }
-      };
-
-      const detected = detectChildRepos(path.resolve(hostDefault || '.'));
+      // Parent-folder auto-detect: scan projectHome for child git repos
+      const detected = detectChildRepos(resolvedProjectHome);
       let usedAutoDetect = false;
-      if (detected.length >= 2) {
-        log.info(pc.dim(`Detected ${detected.length} git repos under ${path.resolve(hostDefault || '.')}:`));
+
+      if (detected.length >= 1) {
+        log.info(pc.dim(`Detected ${detected.length} git repo${detected.length > 1 ? 's' : ''} under ${resolvedProjectHome}:`));
         for (let i = 0; i < detected.length; i++) {
-          const suffix = i === 0 ? pc.dim('  ← will host .stask/') : '';
-          log.info(`  ${pc.bold(String(i + 1) + '.')} ${detected[i]}${suffix}`);
+          log.info(`  ${pc.bold(String(i + 1) + '.')} ${detected[i]}`);
         }
         log.info('');
-        const useAll = guard(await confirm({ message: `Track all ${detected.length} repositories?`, initialValue: true }));
+        const useAll = guard(await confirm({ message: `Track all ${detected.length} ${detected.length === 1 ? 'repository' : 'repositories'}?`, initialValue: true }));
         if (useAll) {
           for (const r of detected) { collectedPaths.add(r); repos.push(r); }
           usedAutoDetect = true;
@@ -321,8 +377,8 @@ export async function run(args) {
 
       if (!usedAutoDetect) {
         const firstPath = guard(await text({
-          message: 'Host repo path',
-          initialValue: hostDefault,
+          message: 'Repository path (first git repo)',
+          initialValue: detected.length === 1 ? detected[0] : '',
           validate: (v) => {
             if (!v) return 'Required';
             const r = path.resolve(v);
@@ -333,25 +389,25 @@ export async function run(args) {
         const resolvedFirst = path.resolve(firstPath);
         collectedPaths.add(resolvedFirst);
         repos.push(resolvedFirst);
-      }
 
-      // Loop: offer to add more repos (skipped when auto-detect was accepted)
-      let addMore = !usedAutoDetect;
-      while (addMore) {
-        const ans = guard(await confirm({ message: 'Add another repository?', initialValue: false }));
-        if (!ans) { addMore = false; break; }
-        const extraPath = guard(await text({
-          message: 'Repository path',
-          validate: (v) => {
-            if (!v) return 'Required';
-            const r = path.resolve(v);
-            if (!fs.existsSync(r)) return 'Path does not exist';
-            if (collectedPaths.has(r)) return 'Duplicate repo path';
-          },
-        })).trim();
-        const resolvedExtra = path.resolve(extraPath);
-        collectedPaths.add(resolvedExtra);
-        repos.push(resolvedExtra);
+        // Loop: offer to add more repos
+        let addMore = true;
+        while (addMore) {
+          const ans = guard(await confirm({ message: 'Add another repository?', initialValue: false }));
+          if (!ans) { addMore = false; break; }
+          const extraPath = guard(await text({
+            message: 'Repository path',
+            validate: (v) => {
+              if (!v) return 'Required';
+              const r = path.resolve(v);
+              if (!fs.existsSync(r)) return 'Path does not exist';
+              if (collectedPaths.has(r)) return 'Duplicate repo path';
+            },
+          })).trim();
+          const resolvedExtra = path.resolve(extraPath);
+          collectedPaths.add(resolvedExtra);
+          repos.push(resolvedExtra);
+        }
       }
     }
 
@@ -359,20 +415,17 @@ export async function run(args) {
 
     // Confirm summary
     const repoLabel = repos.length === 1 ? 'repository' : 'repositories';
-    log.info(pc.dim(`You're tracking ${repos.length} ${repoLabel}:`));
+    log.info(pc.dim(`You're tracking ${repos.length} ${repoLabel} under ${resolvedProjectHome}:`));
     for (let i = 0; i < repos.length; i++) {
-      const suffix = i === 0 ? pc.dim('  ← hosts .stask/') : '';
-      log.info(`  ${i + 1}. ${repos[i]}${suffix}`);
+      log.info(`  ${i + 1}. ${repos[i]}`);
     }
-    log.info('');
+    log.info(pc.dim(`\n.stask/ will be created in ${resolvedProjectHome}\n`));
 
-    state.data.repoPath = repos[0];
-    state.data.extraRepoPaths = repos.slice(1);
+    state.data.repos = repos; // array of absolute paths (converted to relative on write)
   }
 
-  const resolvedRepoPath = state.data.repoPath;
-  // Back-compat: keep detectedRepoPath consistent for any downstream checks
-  if (!detectedRepoPath) detectedRepoPath = resolvedRepoPath;
+  // Back-compat alias for any downstream code that reads repoPath
+  const resolvedRepoPath = state.data.projectHome;
 
   // ── Jira project key (optional) ────────────────────────────────
   if (state.data.jiraKey === undefined) {
@@ -659,7 +712,7 @@ export async function run(args) {
 
     const ctx = {
       slug: d.projectSlug,
-      repoPath: d.repoPath,
+      repoPath: d.projectHome,
       leadToken,
       channelId: '',
       listId: '',
@@ -667,7 +720,7 @@ export async function run(args) {
       humanUserId: d.humanSlackUserId,
       agents: staskAgents,
       allUserIds: [...Object.values(d.slackAccounts).map((a) => a.userId), d.humanSlackUserId].filter(Boolean),
-      staskConfigPath: path.join(d.repoPath, '.stask', 'config.json'),
+      staskConfigPath: path.join(d.projectHome, '.stask', 'config.json'),
     };
 
     // Channel
@@ -738,7 +791,7 @@ export async function run(args) {
 
     const inboxCtx = buildContext({
       staskConfig: { agents: inboxAgents, human: { slackUserId: d.humanSlackUserId }, slack: { listId: d.slackListId } },
-      slug: d.projectSlug, repoPath: d.repoPath, leadToken: d.slackAccounts[d.agents[LEAD_ROLE.id].name]?.botToken,
+      slug: d.projectSlug, repoPath: d.projectHome, leadToken: d.slackAccounts[d.agents[LEAD_ROLE.id].name]?.botToken,
     });
 
     if (headless) {
@@ -774,7 +827,7 @@ export async function run(args) {
 
     const regCtx = buildContext({
       staskConfig: { agents: staskAgents, human: { slackUserId: d.humanSlackUserId }, slack: { listId: d.slackListId } },
-      slug: d.projectSlug, repoPath: d.repoPath, leadToken: d.slackAccounts[d.agents[LEAD_ROLE.id].name]?.botToken,
+      slug: d.projectSlug, repoPath: d.projectHome, leadToken: d.slackAccounts[d.agents[LEAD_ROLE.id].name]?.botToken,
     });
 
     await stepOpenclaw(s, regCtx, agentModels, TEAM_MANIFEST, d.slackAccounts);
@@ -796,12 +849,12 @@ export async function run(args) {
 
     // stask project init
     s.start('Initializing stask project...');
-    const staskDir = path.join(d.repoPath, '.stask');
+    const staskDir = path.join(d.projectHome, '.stask');
     if (!fs.existsSync(path.join(staskDir, 'config.json'))) {
       initProject({
         name: d.projectSlug,
-        repoPath: d.repoPath,
-        extraRepoPaths: d.extraRepoPaths || [],
+        projectHome: d.projectHome,
+        repos: d.repos || [],
         jira: d.jiraKey ? { projectKey: d.jiraKey } : undefined,
         configOverrides: {
           human: { name: d.humanName, githubUsername: d.humanGithub, slackUserId: d.humanSlackUserId || 'UXXXXXXXXXX' },
@@ -855,7 +908,7 @@ export async function run(args) {
 
   const installCtx = buildContext({
     staskConfig: { agents: {}, human: {}, slack: { listId: d.slackListId, channelId: d.slackChannelId } },
-    slug: d.projectSlug, repoPath: d.repoPath, leadToken: '',
+    slug: d.projectSlug, repoPath: d.projectHome, leadToken: '',
   });
   installCtx.canvasId = d.canvasId;
   // Reload agents for install checks
@@ -874,7 +927,7 @@ export async function run(args) {
       const { installPersistence: installEventDaemonPersistence } = await import('../lib/setup/event-daemon-persist.mjs');
       const eventDaemonPid = startEventDaemon();
       // Give the daemon up to 8 seconds to connect and write a 'connected' log line
-      const staskDir = path.join(d.repoPath || process.cwd(), '.stask');
+      const staskDir = path.join(d.projectHome || process.cwd(), '.stask');
       const logFile = path.join(staskDir, 'logs', 'event-daemon.log');
       const WAIT_MS = 8000;
       const POLL_MS = 300;
@@ -900,7 +953,7 @@ export async function run(args) {
       // Install OS-level persistence (launchd on macOS, systemd on Linux)
       s.start('Installing event daemon persistence...');
       try {
-        const staskHome = path.join(d.repoPath || process.cwd(), '.stask');
+        const staskHome = path.join(d.projectHome || process.cwd(), '.stask');
         const daemonScript = path.resolve(__dirname, '../bin/stask-event-daemon.mjs');
         const persist = installEventDaemonPersistence({
           nodeExecPath: process.execPath,
@@ -937,7 +990,7 @@ export async function run(args) {
 
   const bootstrapCtx = buildContext({
     staskConfig: { agents: bootstrapAgents, human: { slackUserId: d.humanSlackUserId }, slack: { listId: d.slackListId, channelId: d.slackChannelId } },
-    slug: d.projectSlug, repoPath: d.repoPath, leadToken: d.slackAccounts[d.agents[LEAD_ROLE.id].name]?.botToken,
+    slug: d.projectSlug, repoPath: d.projectHome, leadToken: d.slackAccounts[d.agents[LEAD_ROLE.id].name]?.botToken,
   });
   bootstrapCtx.canvasId = d.canvasId;
   await stepActivateListChannel(s, bootstrapCtx);
@@ -974,7 +1027,7 @@ export async function run(args) {
   note([
     `${pc.bold('Project')}    ${d.projectName} ${pc.dim(`(${d.projectSlug})`)}`,
     `${pc.bold('Workspace')}  ${dimPath(wsPath)}`,
-    `${pc.bold('Repo')}       ${dimPath(d.repoPath)}`,
+    `${pc.bold('Home')}       ${dimPath(d.projectHome)}`,
     `${pc.bold('Channel')}    ${pc.cyan('#' + d.projectSlug + '-project')} ${pc.dim(d.slackChannelId || '')}`,
     '',
     `${pc.bold('Team:')}`,
@@ -1167,7 +1220,7 @@ function buildPlaceholders(d) {
   const workspaceRoot = path.join(OPENCLAW_HOME, `workspace-${d.projectSlug}`);
   const p = {
     '{{PROJECT_NAME}}': d.projectName, '{{PROJECT_SLUG}}': d.projectSlug,
-    '{{PROJECT_ROOT}}': d.repoPath, '{{OPENCLAW_HOME}}': OPENCLAW_HOME,
+    '{{PROJECT_ROOT}}': d.projectHome, '{{OPENCLAW_HOME}}': OPENCLAW_HOME,
     '{{WORKSPACE_ROOT}}': workspaceRoot,
     '{{HUMAN_NAME}}': d.humanName, '{{HUMAN_GITHUB_USERNAME}}': d.humanGithub,
     '{{HUMAN_SLACK_USER_ID}}': d.humanSlackUserId || 'UXXXXXXXXXX',

@@ -45,7 +45,9 @@ function listProjects(args) {
 
   if (jsonMode) {
     const result = entries.map(([name, info]) => {
-      const staskDir = path.join(info.repoPath, '.stask');
+      // Support both new 'projectHome' and legacy 'repoPath' fields
+      const projectHome = info.projectHome || info.repoPath;
+      const staskDir = path.join(projectHome, '.stask');
       const configPath = path.join(staskDir, 'config.json');
       const hasConfig = fs.existsSync(configPath);
       let agents = [];
@@ -70,7 +72,7 @@ function listProjects(args) {
         } catch {}
       }
 
-      return { name, repoPath: info.repoPath, configured: hasConfig, agents, slackListId, taskCount };
+      return { name, projectHome, configured: hasConfig, agents, slackListId, taskCount };
     });
     console.log(JSON.stringify(result, null, 2));
     return;
@@ -80,10 +82,12 @@ function listProjects(args) {
   console.log('Registered projects:');
   console.log('');
   for (const [name, info] of entries) {
-    const staskDir = path.join(info.repoPath, '.stask');
+    // Support both new 'projectHome' and legacy 'repoPath' fields
+    const projectHome = info.projectHome || info.repoPath;
+    const staskDir = path.join(projectHome, '.stask');
     const hasConfig = fs.existsSync(path.join(staskDir, 'config.json'));
     const status = hasConfig ? '' : ' (missing .stask/config.json)';
-    console.log(`  ${name.padEnd(maxName + 2)}${info.repoPath}${status}`);
+    console.log(`  ${name.padEnd(maxName + 2)}${projectHome}${status}`);
   }
 }
 
@@ -102,11 +106,13 @@ function showProject(name) {
     process.exit(1);
   }
 
-  const staskDir = path.join(project.repoPath, '.stask');
+  // Support both new 'projectHome' and legacy 'repoPath' fields
+  const projectHome = project.projectHome || project.repoPath;
+  const staskDir = path.join(projectHome, '.stask');
   const configPath = path.join(staskDir, 'config.json');
 
   console.log(`Project: ${name}`);
-  console.log(`Repo:    ${project.repoPath}`);
+  console.log(`Home:    ${projectHome}`);
   console.log(`Data:    ${staskDir}`);
 
   if (!fs.existsSync(configPath)) {

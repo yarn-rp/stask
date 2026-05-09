@@ -15,14 +15,14 @@ stask supports multiple projects. Each project lives in a repo with a `.stask/` 
 - **Explicit selection:** Use `--project <name>` flag on any command to target a specific project.
 - **Project registry:** `npx @web42/stask projects` lists all registered projects.
 - **Cross-project heartbeat:** `npx @web42/stask heartbeat-all <agent>` returns pending work across all projects.
-- **New project:** `npx @web42/stask init <name> --repo <path>` scaffolds a new project.
+- **New project:** `npx @web42/stask setup <path>` scaffolds a new project (interactive wizard).
 - **Secrets:** `SLACK_TOKEN` comes from env var or `~/.stask/config.json` (no `.env` files).
 
 ### Multi-project commands
 
 | Command | Purpose |
 |---------|---------|
-| `npx @web42/stask init <name> --repo <path>` | Create a new stask project |
+| `npx @web42/stask setup <path>` | Create a new stask project (interactive wizard) |
 | `npx @web42/stask projects [show <name>]` | List/show registered projects |
 | `npx @web42/stask heartbeat-all <agent-name>` | Get pending work across all projects |
 | `--project <name>` | Global flag — target a specific project |

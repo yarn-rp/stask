@@ -142,7 +142,10 @@ function stopAll() {
 
   // Kill daemons tracked by PID files in each project
   for (const [name, info] of projects) {
-    const pidPath = path.join(info.repoPath, '.stask', 'sync-daemon.pid');
+    // Support both new 'projectHome' and legacy 'repoPath' fields
+    const projectHome = info.projectHome || info.repoPath;
+    if (!projectHome) continue;
+    const pidPath = path.join(projectHome, '.stask', 'sync-daemon.pid');
     try {
       const pid = parseInt(fs.readFileSync(pidPath, 'utf-8').trim(), 10);
       if (isAlive(pid)) {

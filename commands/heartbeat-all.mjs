@@ -36,7 +36,10 @@ export async function run(args) {
   const projectResults = [];
 
   for (const [projectName, projectInfo] of projects) {
-    const configPath = path.join(projectInfo.repoPath, '.stask', 'config.json');
+    // Support both new 'projectHome' and legacy 'repoPath' fields
+    const projectHome = projectInfo.projectHome || projectInfo.repoPath;
+    if (!projectHome) continue;
+    const configPath = path.join(projectHome, '.stask', 'config.json');
 
     // Skip projects without config
     if (!fs.existsSync(configPath)) continue;
